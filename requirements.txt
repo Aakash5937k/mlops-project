@@ -1,0 +1,9 @@
+pandas 
+numpy
+mlflow
+pytest
+pytest-cov
+great-expectations
+openlineage-python
+feast
+evidently
