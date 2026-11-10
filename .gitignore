@@ -1,7 +1,13 @@
 .env
 venv/
 __pycache__/
-data/raw/
+data/raw/*
+data/raw/calendar
+data/raw/rtm
+data/raw/weather
+data/raw/dam
+!data/raw/**/*.dvc
+!data/raw/**/*.gitignore
 data/processed/
 mlruns/
 .ipynb_checkpoints
@@ -9,3 +15,4 @@ mlruns/
 .DS_Store
 Thumbs.db
 intialization_steps.txt
+inputdata/march_2025_data
