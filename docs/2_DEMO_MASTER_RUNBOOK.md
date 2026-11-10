@@ -79,6 +79,9 @@ Get-Content data\raw\weather.dvc               # show the .dvc file (md5 hash ->
 ```powershell
 # install packages 
 pip install great-expectations==0.17.22 SQLAlchemy==2.0.48 psycopg2-binary==2.9.11
+
+Intialize 
+great_expectations init
 ```
 
 ```powershell
@@ -87,11 +90,23 @@ python src/2_validation/5_gx_validate_local.py --start 2025-03-01 --end 2025-03-
 
 # Quick demo - one day, all datasets
 python src/2_validation/5_gx_validate_local.py --date 2025-03-15 --dataset all
+
+python src/1_ingestion/2_ingest_generation_local.py --start 2025-03-15 --end 2025-03-15. For Generation data
 ```
 
 ```powershell
-start gx\uncommitted\data_docs\local_site\index.html           # GE Data Docs (best visual)
+start gx\uncommitted\data_docs\local_site\index.html   
+
+mac 
+open gx/uncommitted/data_docs/local_site/index.html        # GE Data Docs (best visual)
 ```
+
+dvc add data/raw/weather
+dvc add data/raw/calendar
+dvc add data/raw/dam
+dvc add data/raw/rtm
+dvc add data/raw/generation
+
 
 ---
 

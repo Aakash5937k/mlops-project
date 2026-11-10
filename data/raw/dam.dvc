@@ -1,0 +1,6 @@
+outs:
+- md5: 8712ef768567f9f056933456bc27c67f.dir
+  size: 309112
+  nfiles: 28
+  hash: md5
+  path: dam

@@ -16,3 +16,5 @@ mlruns/
 Thumbs.db
 intialization_steps.txt
 inputdata/march_2025_data
+
+data/validated/

@@ -1,0 +1,6 @@
+outs:
+- md5: f3c0b53c56ca56f31be9a2d8a62d1307.dir
+  size: 1629
+  nfiles: 1
+  hash: md5
+  path: calendar
