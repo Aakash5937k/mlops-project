@@ -24,3 +24,4 @@ data/features/march_2025_eda/march_2025_prepared.parquet
 mlflow-artifacts
 metrics.json
 mlflow.db
+eval_metrics.json
