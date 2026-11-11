@@ -20,3 +20,7 @@ inputdata/march_2025_data
 data/validated/
 
 data/features/march_2025_eda/march_2025_prepared.parquet
+
+mlflow-artifacts
+metrics.json
+mlflow.db

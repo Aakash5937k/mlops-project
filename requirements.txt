@@ -18,5 +18,8 @@ psycopg2-binary==2.9.11
 openlineage-python>=1.0.0
 feast
 evidently==0.7.23
+xgboost==3.2.0
+scikit-learn==1.8.0
 dvc
 #dvc==3.67.0
+prophet

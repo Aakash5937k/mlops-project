@@ -7,7 +7,7 @@ __dummy_idJmy_feature_store
 }
 _
 block_id715-minute time block identifier (e.g. 2025-03-15T14:30)"block_idJmy_feature_store
-‘øÏ×ˆœçN‘øÏ×ˆœçN1"$f630d2ed-480c-4224-83d8-77bab07b69b0*ı€Ğ×ØÂø§2†
+‘øÏ×ˆœçN‘øÏ×ˆœçN1"$d35b524f-0ebc-4a0f-9cc7-57664e3b99e5*áĞ×ºÏÔ2ª
 º
 market_featuresmy_feature_storeblock_id"
 dam_mcp"
@@ -29,22 +29,26 @@ mcp_spread"
 dam_mcp_lag_7d"
 dam_mcp_roll_4h"
 dam_mcp_roll_24h"
-dam_mcp_roll_std_24h2€ç„:«event_timestampZ" data/march_2025_features.parquetŠ1feast.infra.offline_stores.file_source.FileSource¢ data/march_2025_features.parquet’‘øÏ×˜©†>"‘øÏ×¸ªİN@b
-block_id’latestG
-‘øÏ×èğêNı€Ğ×ˆ½’
+dam_mcp_roll_std_24h2€ç„:«event_timestampZ" data/march_2025_features.parquetŠ1feast.infra.offline_stores.file_source.FileSource¢ data/march_2025_features.parquet’ŠáĞ×€ÿ’["ŠáĞ×€ÿ’[@b
+block_id’latestk
+‘øÏ×èğêNáĞ×è©ùÀ
 ¨•ËÈøæ¶ı–Ñ×
-€†Ó¾€©Ø¾02¤
+€†Ó¾€©Ø¾
+ı–Ñ×şóÑ×
+şóÑ×âûÑ×02È
 Ø
 weather_featuresmy_feature_storeblock_id"
 avg_temp"
 avg_humidity"
 avg_windspeed"
 avg_cloud_cover"
-total_rainfall2€ç„:«event_timestampZ" data/march_2025_features.parquetŠ1feast.infra.offline_stores.file_source.FileSource¢ data/march_2025_features.parquet’‘øÏ×˜©†>"‘øÏ×¸ªİN@b
-block_id’latestG
-‘øÏ×àş‚Oı€Ğ×È¯µ›
+total_rainfall2€ç„:«event_timestampZ" data/march_2025_features.parquetŠ1feast.infra.offline_stores.file_source.FileSource¢ data/march_2025_features.parquet’ŠáĞ×€ÿ’["ŠáĞ×€ÿ’[@b
+block_id’latestk
+‘øÏ×àş‚OáĞ× åÏÊ
 ¨•ËÈ¨ûç¶ı–Ñ×
-€†Ó¾€©Ø¾02Ë
+€†Ó¾€©Ø¾
+ı–Ñ×şóÑ×
+şóÑ×âûÑ×02ï
 ÿ
 calendar_featuresmy_feature_storeblock_id"
 hour_sin"
@@ -64,11 +68,13 @@ is_weekend"
 is_festival"
 is_wedding_season"
 
-impact2€ç„:«event_timestampZ" data/march_2025_features.parquetŠ1feast.infra.offline_stores.file_source.FileSource¢ data/march_2025_features.parquet’‘øÏ×˜©†>"‘øÏ×¸ªİN@b
-block_id’latestG
-‘øÏ×€ôOı€Ğ×°£ë§
+impact2€ç„:«event_timestampZ" data/march_2025_features.parquetŠ1feast.infra.offline_stores.file_source.FileSource¢ data/march_2025_features.parquet’ŠáĞ×€ÿ’["ŠáĞ×€ÿ’[@b
+block_id’latestk
+‘øÏ×€ôOáĞ×˜ˆÃÔ
 ¨•ËÈàé¶ı–Ñ×
-€†Ó¾€©Ø¾0:´	
+€†Ó¾€©Ø¾
+ı–Ñ×şóÑ×
+şóÑ×âûÑ×0:´	
 •	
 dam_mcp_forecast_v1my_feature_storeÖ
 market_features
