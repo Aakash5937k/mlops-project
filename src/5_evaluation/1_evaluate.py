@@ -7,6 +7,12 @@ metrics and plots to MLflow, and optionally gates model promotion.
 If the model passes the quality threshold, it is tagged as "passed_eval=true"
 in MLflow so downstream systems (app.py, CI/CD) can trust it.
 
+The test partition scored here is the tail that train.py withheld (see
+src/splits.py) — no model was fitted on it and no champion was selected using
+it, so these metrics are an unbiased generalisation estimate and the gate below
+means something. The split fractions are read back from metrics.json, so this
+script always scores exactly the rows the training run set aside.
+
 Pipeline position:
   train.py -> evaluate.py -> predict.py
   (DVC stage: evaluate, runs after train)
@@ -46,6 +52,9 @@ if sys.stderr.encoding != "utf-8":
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.splits import resolve_split, split_bounds  # noqa: E402
+
 FEAST_REPO = PROJECT_ROOT / "my_feature_store" / "feature_repo"
 METRICS_PATH = PROJECT_ROOT / "metrics.json"
 EVAL_METRICS_PATH = PROJECT_ROOT / "eval_metrics.json"
@@ -66,8 +75,12 @@ logging.getLogger("feast").setLevel(logging.WARNING)
 # -- CLI ---------------------------------------------------------------------
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Evaluate best model and gate promotion")
-    parser.add_argument("--test-size", type=float, default=0.2,
-                        help="Fraction of data to hold out as test set (default: 0.2)")
+    parser.add_argument("--val-size", type=float, default=None,
+                        help="Override the validation fraction. Defaults to the split "
+                             "recorded in metrics.json by the training run.")
+    parser.add_argument("--test-size", type=float, default=None,
+                        help="Override the test fraction. Defaults to the split "
+                             "recorded in metrics.json by the training run.")
     parser.add_argument("--rmse-threshold", type=float, default=None,
                         help="Max acceptable RMSE. If exceeded, model fails evaluation.")
     parser.add_argument("--mape-threshold", type=float, default=None,
@@ -120,8 +133,13 @@ def load_best_model():
 
 
 # -- Fetch and prepare data --------------------------------------------------
-def fetch_and_split(test_size: float):
-    """Fetch from Feast and create the same time-based split as train.py."""
+def fetch_and_split(val_size_override: float | None, test_size_override: float | None):
+    """Fetch from Feast and return only the test partition train.py withheld."""
+    val_size, test_size, source = resolve_split(
+        val_size_override, test_size_override, METRICS_PATH
+    )
+    log.info(f"Split: val={val_size}, test={test_size} (from {source})")
+
     store = FeatureStore(repo_path=str(FEAST_REPO))
     source_path = FEAST_REPO / "data" / "march_2025_features.parquet"
     source_df = pd.read_parquet(source_path)
@@ -148,13 +166,15 @@ def fetch_and_split(test_size: float):
         if pd.api.types.is_integer_dtype(X[col]):
             X[col] = X[col].astype(float)
 
-    # Same time-based split as train.py
-    n = max(1, int(len(X) * (1 - test_size)))
-    X_test = X.iloc[n:]
-    y_test = y.iloc[n:]
-    ts_test = df[TIMESTAMP_COL].iloc[n:]
+    # Same boundaries as train.py, via the same helper. Only [test_start:] is
+    # read — the rows the model was fitted on and selected with stay excluded.
+    _, test_start = split_bounds(len(X), val_size, test_size)
+    X_test = X.iloc[test_start:]
+    y_test = y.iloc[test_start:]
+    ts_test = df[TIMESTAMP_COL].iloc[test_start:]
 
-    log.info(f"Evaluation set: {len(X_test)} rows (last {test_size*100:.0f}% by time)")
+    log.info(f"Holdout test set: {len(X_test)} rows (last {test_size*100:.0f}% by time), "
+             f"unseen by training and model selection")
     return X_test, y_test, ts_test
 
 
@@ -270,8 +290,8 @@ def main():
         # 1. Load best model from MLflow
         model, run_id, run_name, model_version = load_best_model()
 
-        # 2. Fetch test data (same split as training)
-        X_test, y_test, ts_test = fetch_and_split(args.test_size)
+        # 2. Fetch the holdout partition training never saw
+        X_test, y_test, ts_test = fetch_and_split(args.val_size, args.test_size)
 
         # 3. Run predictions
         log.info("Running predictions on evaluation set...")
@@ -326,6 +346,7 @@ def main():
         eval_output = {
             "evaluated_model": run_name,
             "evaluated_run_id": run_id,
+            "eval_rows": len(X_test),
             "passed": passed,
             **metrics,
         }
@@ -336,9 +357,10 @@ def main():
     # 9. Summary
     log.info("")
     log.info("=" * 55)
-    log.info("EVALUATION RESULTS")
+    log.info("EVALUATION RESULTS (holdout test set — unseen by training)")
     log.info("-" * 55)
     log.info(f"  Model:     {run_name} ({run_id})")
+    log.info(f"  Test rows: {len(X_test)}")
     log.info(f"  RMSE:      {metrics['eval_rmse']:.4f}")
     log.info(f"  MAE:       {metrics['eval_mae']:.4f}")
     log.info(f"  MAPE:      {metrics['eval_mape']:.2f}%")
