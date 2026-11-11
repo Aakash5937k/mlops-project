@@ -25,3 +25,5 @@ mlflow-artifacts
 metrics.json
 mlflow.db
 eval_metrics.json
+
+promote_report.json

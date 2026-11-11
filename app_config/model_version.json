@@ -1,0 +1,11 @@
+{
+  "model_name": "dam_mcp_forecast",
+  "model_version": "3",
+  "alias": "champion",
+  "run_id": "9df25ef0a64b4aa2b09009f6daba0f76",
+  "run_name": "gradient_boosting",
+  "eval_rmse": 470.83037893104154,
+  "eval_mae": 305.3685268879413,
+  "eval_mape": 6.383744236455362,
+  "promoted_at": "2026-11-11T10:27:42.943616+00:00"
+}
