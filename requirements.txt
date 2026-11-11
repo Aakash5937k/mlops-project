@@ -1,4 +1,5 @@
 pandas==2.3.3 
+pyarrow==23.0.1
 numpy==2.4.3
 requests==2.32.5 
 beautifulsoup4==4.14.3 
@@ -8,13 +9,14 @@ playwright==1.58.0
 #boto3==1.42.72 
 python-dotenv==1.2.2
 chromium
-mlflow
+mlflow==3.10.1
 pytest
 pytest-cov
 great_expectations==0.17.22
 SQLAlchemy==2.0.48 
 psycopg2-binary==2.9.11
 openlineage-python>=1.0.0
-#feast
+feast
 evidently==0.7.23
 dvc
+#dvc==3.67.0

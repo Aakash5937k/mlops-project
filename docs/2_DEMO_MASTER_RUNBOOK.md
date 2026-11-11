@@ -91,7 +91,8 @@ python src/2_validation/5_gx_validate_local.py --start 2025-03-01 --end 2025-03-
 # Quick demo - one day, all datasets
 python src/2_validation/5_gx_validate_local.py --date 2025-03-15 --dataset all
 
-python src/1_ingestion/2_ingest_generation_local.py --start 2025-03-15 --end 2025-03-15. For Generation data
+# For Generation data
+python src/1_ingestion/2_ingest_generation_local.py --start 2025-03-15 --end 2025-03-15. 
 ```
 
 ```powershell
@@ -128,13 +129,24 @@ start http://localhost:5000                    # MLflow UI
 
 #### Independent runs
 
+feast init
+
+cd my_feature_store/feature_repo
+
+feast apply # to register 
+
 Run each stage as its own script. After each, the comment says where to check the output.
 
 ```powershell
 python src/3_feature_engineering/1_build_features.py   # -> data/features/march_2025_eda/march_2025_prepared.parquet
 python "src\3_feature_engineering\2_prepare_feast_data.py"    # -> Feast source parquet
+
+python src/3_feature_engineering/3_refresh_online_store.py 
+
 python src/4_training/1_train.py                 # MLflow: Experiments > dam_mcp_forecast - compare the 5 runs by rmse
-python src/5_evaluation/1_evaluate.py              # MLflow: the run tagged passed_eval - eval_rmse / eval_mae / eval_mape
+
+
+python src/5_evaluation/1_evaluate.py 
 python src/6_promotion/1_promote_model.py               # MLflow: Models > dam_mcp_forecast - the champion alias on the new version
 ```
 
