@@ -27,3 +27,4 @@ mlflow.db
 eval_metrics.json
 
 promote_report.json
+mlflow.db.backup
