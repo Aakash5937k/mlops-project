@@ -29,6 +29,7 @@ DB_PATH = FEAST_REPO / "data" / "online_store.db"
 # 1. RAW SQLITE QUERIES
 # -------------------------------------------------------------
 
+
 def query_sqlite():
     print("=" * 70)
     print("1. RAW SQLITE — What's inside online_store.db")
@@ -79,6 +80,7 @@ def query_sqlite():
 # -------------------------------------------------------------
 # 2. FEAST API QUERIES
 # -------------------------------------------------------------
+
 
 def query_feast_api():
     print("\n" + "=" * 70)
@@ -194,6 +196,7 @@ def query_feast_api():
 # 3. COMPARE OFFLINE vs ONLINE
 # -------------------------------------------------------------
 
+
 def compare_offline_online():
     print("\n" + "=" * 70)
     print("3. OFFLINE vs ONLINE — Consistency check")
@@ -214,15 +217,17 @@ def compare_offline_online():
     ]
 
     # Offline
-    entity_df = pd.DataFrame({
-        "block_id": check_blocks,
-        "event_timestamp": pd.to_datetime(
-            [b.replace("T", " ") for b in check_blocks],
-            utc=True
-        ),
-    })
+    entity_df = pd.DataFrame(
+        {
+            "block_id": check_blocks,
+            "event_timestamp": pd.to_datetime(
+                [b.replace("T", " ") for b in check_blocks], utc=True
+            ),
+        }
+    )
     offline_df = store.get_historical_features(
-        entity_df=entity_df, features=features,
+        entity_df=entity_df,
+        features=features,
     ).to_df()
 
     # Online
@@ -231,17 +236,21 @@ def compare_offline_online():
         entity_rows=[{"block_id": b} for b in check_blocks],
     ).to_dict()
 
-    print(f"\n  {'block_id':>20s} | {'source':>8s} | {'dam_mcp':>10s} | {'lag_1d':>10s} | {'temp':>8s} | {'peak':>6s}")
+    print(
+        f"\n  {'block_id':>20s} | {'source':>8s} | {'dam_mcp':>10s} | {'lag_1d':>10s} | {'temp':>8s} | {'peak':>6s}"
+    )
     print(f"  {'-' * 20}-+{'-' * 10}+{'-' * 12}+{'-' * 12}+{'-' * 10}+{'-' * 8}")
 
     for i, block in enumerate(check_blocks):
         off_row = offline_df[offline_df["block_id"] == block].iloc[0]
-        print(f"  {block:>20s} | {'offline':>8s} | {off_row['dam_mcp']:>10.2f} | {off_row['dam_mcp_lag_1d']:>10.2f} | {off_row['avg_temp']:>8.1f} | {int(off_row['is_peak_hour']):>6d}")
-        #print(f"  {'':>20s} | {'online':>8s} | {online_result['dam_mcp'][i]:>10.2f} | {online_result['dam_mcp_lag_1d'][i]:>10.2f} | {online_result['avg_temp'][i]:>8.1f} | {online_result['is_peak_hour'][i]:>6d}")
-        online_dam = online_result['dam_mcp'][i]
-        online_lag = online_result['dam_mcp_lag_1d'][i]
-        online_temp = online_result['avg_temp'][i]
-        online_peak = online_result['is_peak_hour'][i]
+        print(
+            f"  {block:>20s} | {'offline':>8s} | {off_row['dam_mcp']:>10.2f} | {off_row['dam_mcp_lag_1d']:>10.2f} | {off_row['avg_temp']:>8.1f} | {int(off_row['is_peak_hour']):>6d}"
+        )
+        # print(f"  {'':>20s} | {'online':>8s} | {online_result['dam_mcp'][i]:>10.2f} | {online_result['dam_mcp_lag_1d'][i]:>10.2f} | {online_result['avg_temp'][i]:>8.1f} | {online_result['is_peak_hour'][i]:>6d}")
+        online_dam = online_result["dam_mcp"][i]
+        online_lag = online_result["dam_mcp_lag_1d"][i]
+        online_temp = online_result["avg_temp"][i]
+        online_peak = online_result["is_peak_hour"][i]
 
         print(
             f"  {'':>20s} | {'online':>8s} | "

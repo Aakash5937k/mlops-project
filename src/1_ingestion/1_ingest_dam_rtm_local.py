@@ -49,14 +49,14 @@ Dependencies
   NO boto3. NO psycopg2. NO sqlalchemy.
 """
 
-import sys
+import argparse
 import json
+import logging
+import sys
 import time
 import uuid
-import logging
-import argparse
+from datetime import UTC, datetime
 from pathlib import Path
-from datetime import datetime
 
 import pandas as pd
 from bs4 import BeautifulSoup
@@ -64,8 +64,8 @@ from dotenv import load_dotenv
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 
 load_dotenv()
 
@@ -200,14 +200,14 @@ def _save_summary(
     rows: int,
     status: str,
     started: datetime,
-    error: str = None,
+    error: str | None = None,
 ):
     """
     Plain JSON file saved next to the Bronze CSV.
     gx_validate.py reads this for audit information.
     No Postgres. No SQLite. The info travels with the data itself.
     """
-    completed = datetime.utcnow()
+    completed = datetime.now(UTC)
     summary = {
         "run_id": RUN_ID,
         "market": market,
@@ -234,7 +234,7 @@ def timed(func):
         t0 = time.time()
         result = func(*args, **kwargs)
         secs = time.time() - t0
-        log.info(f"  {func.__name__} — {secs/60:.1f} min ({secs:.0f}s)")
+        log.info(f"  {func.__name__} — {secs / 60:.1f} min ({secs:.0f}s)")
         return result
 
     return wrapper
@@ -255,6 +255,9 @@ def _iex_url(market: str, days: int) -> str:
 # ─────────────────────────────────────────────────────────────
 # SELENIUM SCRAPER
 # ─────────────────────────────────────────────────────────────
+from selenium.common.exceptions import WebDriverException
+
+
 @timed
 def _scrape(url: str, market: str, days: int) -> pd.DataFrame:
     """Open Chrome headless, navigate IEX table, read rows day by day."""
@@ -270,7 +273,7 @@ def _scrape(url: str, market: str, days: int) -> pd.DataFrame:
     TABLE_XPATH = "/html/body/div[1]/div[4]/section/div[1]/div[3]/div[1]/table"
     ROW_XPATH = TABLE_XPATH + "/tbody/tr"
     NEXT_BTN_XPATH = (
-        "/html/body/div[1]/div[4]/section/div[1]/div[3]" "/div[2]/div/div[2]/button[3]"
+        "/html/body/div[1]/div[4]/section/div[1]/div[3]/div[2]/div/div[2]/button[3]"
     )
 
     driver.get(url)
@@ -343,7 +346,7 @@ def _scrape(url: str, market: str, days: int) -> pd.DataFrame:
                 btn = wait.until(EC.element_to_be_clickable((By.XPATH, NEXT_BTN_XPATH)))
                 driver.execute_script("arguments[0].click();", btn)
                 time.sleep(3)
-            except Exception as e:
+            except WebDriverException as e:
                 log.warning(f"  Could not click next: {e}")
                 break
 
@@ -493,7 +496,7 @@ def _show_output():
 # PROCESS ONE MARKET
 # ─────────────────────────────────────────────────────────────
 def _process_market(
-    market: str, days: int, target_date: str = None, force: bool = False
+    market: str, days: int, target_date: str | None = None, force: bool = False
 ):
     log.info(f"\n{'─' * 60}")
     log.info(f"  Market  : {market}")
@@ -533,7 +536,7 @@ def _process_market(
     total_skipped = 0
 
     for date_str, raw_day in sorted(daily_chunks.items()):
-        started = datetime.utcnow()
+        started = datetime.now(UTC)
 
         if _already_done(market, date_str, force=force):
             log.info(f"  {date_str} already exists locally — skipping")
@@ -564,7 +567,7 @@ def _process_market(
         log.info(f"  {date_str} — {len(cleaned)} rows")
 
     log.info(
-        f"\n  {market} done — " f"{total_rows} rows saved, {total_skipped} days skipped"
+        f"\n  {market} done — {total_rows} rows saved, {total_skipped} days skipped"
     )
 
 
@@ -572,7 +575,7 @@ def _process_market(
 # MAIN
 # ─────────────────────────────────────────────────────────────
 def main():
-    from src.lineage import lineage_run, ds
+    from src.lineage import ds, lineage_run
 
     args = build_args()
     force = args.force
@@ -600,11 +603,14 @@ def main():
     log.info("Audit     : run_summary.json  (next to each Bronze CSV)")
     log.info("=" * 60)
 
-    with lineage_run("ingest_dam_rtm",
+    with lineage_run(
+        "ingest_dam_rtm",
         inputs=[ds("IEX India", namespace="https://www.iexindia.com")],
         outputs=[
-            ds("data/raw/dam"), ds("data/raw/rtm"),
-            ds("data/processed/dam"), ds("data/processed/rtm"),
+            ds("data/raw/dam"),
+            ds("data/raw/rtm"),
+            ds("data/processed/dam"),
+            ds("data/processed/rtm"),
         ],
     ):
         for market in ["DAM", "RTM"]:

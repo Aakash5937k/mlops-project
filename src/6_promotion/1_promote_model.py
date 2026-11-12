@@ -53,18 +53,25 @@ log = logging.getLogger("promote")
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Promote best model to production")
     parser.add_argument(
-        "--metric", type=str, default="eval_rmse",
+        "--metric",
+        type=str,
+        default="eval_rmse",
         help="Primary metric to compare (default: eval_rmse)",
     )
     parser.add_argument(
-        "--direction", type=str, default="lower", choices=["lower", "higher"],
+        "--direction",
+        type=str,
+        default="lower",
+        choices=["lower", "higher"],
         help="Whether lower or higher metric is better (default: lower)",
     )
     return parser.parse_args()
 
 
 # -- Helpers -----------------------------------------------------------------
-def get_latest_version(client: MlflowClient) -> mlflow.entities.model_registry.ModelVersion | None:
+def get_latest_version(
+    client: MlflowClient,
+) -> mlflow.entities.model_registry.ModelVersion | None:
     """Return the latest model version from the registry."""
     versions = client.search_model_versions(f"name='{REGISTERED_MODEL_NAME}'")
     if not versions:
@@ -72,7 +79,9 @@ def get_latest_version(client: MlflowClient) -> mlflow.entities.model_registry.M
     return max(versions, key=lambda v: int(v.version))
 
 
-def get_production_version(client: MlflowClient) -> mlflow.entities.model_registry.ModelVersion | None:
+def get_production_version(
+    client: MlflowClient,
+) -> mlflow.entities.model_registry.ModelVersion | None:
     """Return the current production model version (by alias)."""
     try:
         mv = client.get_model_version_by_alias(REGISTERED_MODEL_NAME, PRODUCTION_ALIAS)
@@ -115,14 +124,20 @@ def promote_version(client: MlflowClient, version: str, old_production=None):
     """
     # Set the new alias
     client.set_registered_model_alias(
-        REGISTERED_MODEL_NAME, PRODUCTION_ALIAS, version,
+        REGISTERED_MODEL_NAME,
+        PRODUCTION_ALIAS,
+        version,
     )
     # Sync the legacy stage so the UI doesn't show "Archived" / "None"
     client.transition_model_version_stage(
-        REGISTERED_MODEL_NAME, version, stage="Production",
+        REGISTERED_MODEL_NAME,
+        version,
+        stage="Production",
         archive_existing_versions=True,
     )
-    log.info(f"Set alias '{PRODUCTION_ALIAS}' + legacy stage 'Production' on v{version}")
+    log.info(
+        f"Set alias '{PRODUCTION_ALIAS}' + legacy stage 'Production' on v{version}"
+    )
 
     # Write version file — triggers CD when committed
     run = client.get_run(
@@ -147,7 +162,7 @@ def promote_version(client: MlflowClient, version: str, old_production=None):
 
 # -- Main --------------------------------------------------------------------
 def main():
-    from src.lineage import lineage_run, ds
+    from src.lineage import ds, lineage_run
 
     args = parse_args()
 
@@ -158,14 +173,17 @@ def main():
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
     client = MlflowClient()
 
-    with lineage_run("promote",
+    with lineage_run(
+        "promote",
         inputs=[ds("eval_metrics.json")],
         outputs=[ds("promote_report.json"), ds("mlflow/model-registry/champion")],
     ):
         # 1. Get latest version
         latest = get_latest_version(client)
         if latest is None:
-            log.error(f"No model versions found for '{REGISTERED_MODEL_NAME}'. Run train.py first.")
+            log.error(
+                f"No model versions found for '{REGISTERED_MODEL_NAME}'. Run train.py first."
+            )
             sys.exit(1)
 
         log.info(f"Latest model version: v{latest.version} (run_id={latest.run_id})")
@@ -194,7 +212,9 @@ def main():
             log.info("No current production model. Promoting latest version directly.")
             promote_version(client, latest.version)
             latest_metrics = get_run_eval_metrics(client, latest.run_id)
-            log.info(f"Promoted v{latest.version} to '{PRODUCTION_ALIAS}' alias (first production model)")
+            log.info(
+                f"Promoted v{latest.version} to '{PRODUCTION_ALIAS}' alias (first production model)"
+            )
             _save_report(
                 action="promoted",
                 reason="no existing production model",
@@ -206,7 +226,9 @@ def main():
             return
 
         if str(production.version) == str(latest.version):
-            log.info(f"Latest version v{latest.version} is already in production. Nothing to do.")
+            log.info(
+                f"Latest version v{latest.version} is already in production. Nothing to do."
+            )
             latest_metrics = get_run_eval_metrics(client, latest.run_id)
             _save_report(
                 action="no_change",
@@ -218,7 +240,9 @@ def main():
             )
             return
 
-        log.info(f"Current production: v{production.version} (run_id={production.run_id})")
+        log.info(
+            f"Current production: v{production.version} (run_id={production.run_id})"
+        )
 
         # 4. Compare metrics
         latest_metrics = get_run_eval_metrics(client, latest.run_id)

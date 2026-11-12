@@ -26,7 +26,6 @@ Pipeline position:
 from __future__ import annotations
 
 import argparse
-from typing import Tuple
 
 # Defaults: 70% train / 15% validation / 15% test.
 # On the March 2025 feature set (96 blocks/day x 31 days = 2976 rows) that is
@@ -36,7 +35,9 @@ DEFAULT_VAL_SIZE = 0.15
 DEFAULT_TEST_SIZE = 0.15
 
 
-def add_split_args(parser: argparse.ArgumentParser, *, default_none: bool = False) -> None:
+def add_split_args(
+    parser: argparse.ArgumentParser, *, default_none: bool = False
+) -> None:
     """Register --val-size / --test-size on a parser.
 
     default_none=True leaves both as None so the caller can fall back to the
@@ -45,16 +46,20 @@ def add_split_args(parser: argparse.ArgumentParser, *, default_none: bool = Fals
     val_default = None if default_none else DEFAULT_VAL_SIZE
     test_default = None if default_none else DEFAULT_TEST_SIZE
     parser.add_argument(
-        "--val-size", type=float, default=val_default,
+        "--val-size",
+        type=float,
+        default=val_default,
         help=f"Fraction held out for model selection (default: {DEFAULT_VAL_SIZE})",
     )
     parser.add_argument(
-        "--test-size", type=float, default=test_default,
+        "--test-size",
+        type=float,
+        default=test_default,
         help=f"Fraction held out as the final unseen test set (default: {DEFAULT_TEST_SIZE})",
     )
 
 
-def split_bounds(n_rows: int, val_size: float, test_size: float) -> Tuple[int, int]:
+def split_bounds(n_rows: int, val_size: float, test_size: float) -> tuple[int, int]:
     """Return (val_start, test_start) row indices for a time-ordered frame.
 
     train = [:val_start]   val = [val_start:test_start]   test = [test_start:]
@@ -96,8 +101,9 @@ def split_summary(n_rows: int, val_size: float, test_size: float) -> dict:
     }
 
 
-def resolve_split(cli_val_size: float | None, cli_test_size: float | None,
-                  metrics_path) -> Tuple[float, float, str]:
+def resolve_split(
+    cli_val_size: float | None, cli_test_size: float | None, metrics_path
+) -> tuple[float, float, str]:
     """Pick the fractions evaluate.py should use, and say where they came from.
 
     Precedence: explicit CLI flags > the split recorded by the training run that
@@ -112,6 +118,7 @@ def resolve_split(cli_val_size: float | None, cli_test_size: float | None,
     recorded = {}
     try:
         import json
+
         with open(metrics_path) as f:
             recorded = json.load(f).get("split", {}) or {}
     except (OSError, ValueError):
@@ -124,6 +131,14 @@ def resolve_split(cli_val_size: float | None, cli_test_size: float | None,
     else:
         source = "module defaults"
 
-    val_size = cli_val_size if cli_val_size is not None else recorded.get("val_size", DEFAULT_VAL_SIZE)
-    test_size = cli_test_size if cli_test_size is not None else recorded.get("test_size", DEFAULT_TEST_SIZE)
+    val_size = (
+        cli_val_size
+        if cli_val_size is not None
+        else recorded.get("val_size", DEFAULT_VAL_SIZE)
+    )
+    test_size = (
+        cli_test_size
+        if cli_test_size is not None
+        else recorded.get("test_size", DEFAULT_TEST_SIZE)
+    )
     return float(val_size), float(test_size), source

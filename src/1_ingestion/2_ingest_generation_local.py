@@ -26,14 +26,14 @@ Dependencies
   python -m playwright install chromium
 """
 
+import argparse
 import io
 import json
-import uuid
 import logging
-import argparse
 import sys
+import uuid
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from datetime import datetime, timedelta
 
 import pandas as pd
 import pdfplumber
@@ -123,9 +123,9 @@ def build_args():
 # ─────────────────────────────────────────────────────────────
 def financial_year(d: datetime) -> str:
     return (
-        f"{d.year}-{str(d.year+1)[2:]}"
+        f"{d.year}-{str(d.year + 1)[2:]}"
         if d.month >= 4
-        else f"{d.year-1}-{str(d.year)[2:]}"
+        else f"{d.year - 1}-{str(d.year)[2:]}"
     )
 
 
@@ -234,7 +234,7 @@ def download_pdf(session, d: datetime) -> bytes | None:
         else:
             log.info(f"  {date_str} not published")
             return None
-    except Exception as e:
+    except (requests.RequestException, OSError) as e:
         log.warning(f"  {date_str} download failed: {e}")
         return None
 
@@ -245,7 +245,7 @@ def download_pdf(session, d: datetime) -> bytes | None:
 def _to_float(v):
     try:
         return float(str(v).replace(",", "").strip())
-    except Exception:
+    except (ValueError, TypeError):
         return None
 
 
@@ -289,8 +289,10 @@ def parse_pdf(pdf_bytes: bytes, d: datetime) -> list:
                             fuel = "Total"
                         if fuel and current_region:
                             nums = [_to_float(v) for v in cells[1:]]
-                            def g(i):
+
+                            def g(i, nums=nums):
                                 return nums[i] if i < len(nums) else None
+
                             rows.append(
                                 {
                                     **meta,
@@ -309,7 +311,7 @@ def parse_pdf(pdf_bytes: bytes, d: datetime) -> list:
                                     "error": "",
                                 }
                             )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         rows.append(
             {
                 **meta,
@@ -409,7 +411,7 @@ def already_parsed(date_str: str, fy: str) -> bool:
     try:
         df = pd.read_csv(path, usecols=["date"], dtype=str)
         return date_str in df["date"].values
-    except Exception:
+    except (OSError, ValueError, pd.errors.ParserError):
         return False
 
 
@@ -417,18 +419,19 @@ def already_parsed(date_str: str, fy: str) -> bool:
 # MAIN
 # ─────────────────────────────────────────────────────────────
 def main():
-    from src.lineage import lineage_run, ds
+    from src.lineage import ds, lineage_run
 
     args = build_args()
-    today = datetime.today().replace(hour=0, minute=0, second=0, microsecond=0)
+    today = (
+        datetime.now().astimezone().replace(hour=0, minute=0, second=0, microsecond=0)
+    )
     end_date = args.end or today
     start_date = args.start or (today - timedelta(days=args.days))
 
     if start_date < datetime(2017, 4, 1):
         log.error("Start date before earliest DGR (2017-04-01)")
         sys.exit(1)
-    if end_date > today:
-        end_date = today
+    end_date = min(end_date, today)
 
     log.info("=" * 55)
     log.info("GENERATION INGEST  —  LOCAL MODE")
@@ -438,7 +441,8 @@ def main():
     log.info("Silver  : data/processed/generation/")
     log.info("=" * 55)
 
-    with lineage_run("ingest_generation",
+    with lineage_run(
+        "ingest_generation",
         inputs=[ds("NPP DGR Reports", namespace="https://npp.gov.in")],
         outputs=[ds("data/raw/generation"), ds("data/processed/generation")],
     ):
@@ -502,7 +506,7 @@ def main():
             json.dumps(
                 {
                     "run_id": RUN_ID,
-                    "run_at": datetime.utcnow().isoformat(),
+                    "run_at": datetime.now(UTC).isoformat(),
                     "mode": "local",
                     "results": results,
                 },

@@ -44,7 +44,7 @@ jobs:
           pip install ruff pytest-cov
 
       - name: Lint with ruff
-        run: ruff check src/ tests/ --output-format=github
+        run: ruff check --ignore N999 src/ tests/ --output-format=github
 
       - name: Run tests
         run: pytest tests/ -v --cov=src --cov-report=term-missing

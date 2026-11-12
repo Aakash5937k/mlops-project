@@ -34,14 +34,14 @@ Dependencies
   pip install pandas pyarrow requests python-dotenv
 """
 
-import sys
+import argparse
 import json
+import logging
+import sys
 import time
 import uuid
-import logging
-import argparse
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from datetime import datetime, timedelta
 
 import pandas as pd
 import requests
@@ -209,8 +209,8 @@ def fetch(params: dict, retries: int = 6, wait: int = 8) -> dict | None:
             if data.get("hourly") and data["hourly"].get("time"):
                 return data
             time.sleep(wait)
-        except Exception as e:
-            log.warning(f"  Fetch attempt {attempt+1} failed: {e}")
+        except (requests.RequestException, ValueError) as e:
+            log.warning(f"  Fetch attempt {attempt + 1} failed: {e}")
             time.sleep(wait)
     return None
 
@@ -227,7 +227,7 @@ def load_existing(city_name: str) -> pd.DataFrame:
         df = pd.read_csv(path, parse_dates=["time"])
         df.set_index("time", inplace=True)
         return df
-    except Exception:
+    except (OSError, ValueError, pd.errors.ParserError):
         return pd.DataFrame()
 
 
@@ -305,7 +305,7 @@ def save_summary(results: dict, date_str: str):
                 "run_id": RUN_ID,
                 "date": date_str,
                 "mode": "local",
-                "run_at": datetime.utcnow().isoformat(),
+                "run_at": datetime.now(UTC).isoformat(),
                 "cities": results,
             },
             indent=2,
@@ -399,7 +399,7 @@ def process_city(city: dict, start_str: str, end_str: str) -> dict:
 # MAIN
 # ─────────────────────────────────────────────────────────────
 def main():
-    from src.lineage import lineage_run, ds
+    from src.lineage import ds, lineage_run
 
     args = build_args()
     today = datetime.now().strftime("%Y-%m-%d")
@@ -417,7 +417,8 @@ def main():
     log.info("Silver  : data/processed/weather/")
     log.info("=" * 55)
 
-    with lineage_run("ingest_weather",
+    with lineage_run(
+        "ingest_weather",
         inputs=[ds("Open-Meteo API", namespace="https://api.open-meteo.com")],
         outputs=[ds("data/raw/weather"), ds("data/processed/weather")],
     ):
@@ -436,7 +437,7 @@ def main():
                     skipped += 1
                 else:
                     failed += 1
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 log.error(f"  {city['name']} crashed: {e}")
                 results[city["name"]] = {"status": "CRASHED", "rows": 0}
                 failed += 1

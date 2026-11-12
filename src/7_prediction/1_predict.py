@@ -51,17 +51,34 @@ logging.getLogger("feast").setLevel(logging.WARNING)
 
 # -- CLI ---------------------------------------------------------------------
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run batch predictions using best MLflow model")
-    parser.add_argument("--run-id", type=str, default=None,
-                        help="Specific MLflow run ID to load. If omitted, loads best run by RMSE.")
-    parser.add_argument("--output", type=str, default=None,
-                        help="Output CSV path (default: predictions/batch_predictions.csv)")
-    parser.add_argument("--online", action="store_true",
-                        help="Fetch features from the Feast ONLINE store instead of the "
-                             "offline snapshot. Requires --block-id.")
-    parser.add_argument("--block-id", action="append", default=None,
-                        help="block_id to score in online mode (e.g. 2025-03-20T18:00). "
-                             "Repeatable. Only used with --online.")
+    parser = argparse.ArgumentParser(
+        description="Run batch predictions using best MLflow model"
+    )
+    parser.add_argument(
+        "--run-id",
+        type=str,
+        default=None,
+        help="Specific MLflow run ID to load. If omitted, loads best run by RMSE.",
+    )
+    parser.add_argument(
+        "--output",
+        type=str,
+        default=None,
+        help="Output CSV path (default: predictions/batch_predictions.csv)",
+    )
+    parser.add_argument(
+        "--online",
+        action="store_true",
+        help="Fetch features from the Feast ONLINE store instead of the "
+        "offline snapshot. Requires --block-id.",
+    )
+    parser.add_argument(
+        "--block-id",
+        action="append",
+        default=None,
+        help="block_id to score in online mode (e.g. 2025-03-20T18:00). "
+        "Repeatable. Only used with --online.",
+    )
     return parser.parse_args()
 
 
@@ -82,7 +99,9 @@ def load_best_model(run_id: str | None = None):
     # Find best run by RMSE
     experiment = client.get_experiment_by_name(MLFLOW_EXPERIMENT)
     if not experiment:
-        raise RuntimeError(f"Experiment '{MLFLOW_EXPERIMENT}' not found. Run train.py first.")
+        raise RuntimeError(
+            f"Experiment '{MLFLOW_EXPERIMENT}' not found. Run train.py first."
+        )
 
     runs = client.search_runs(
         experiment_ids=[experiment.experiment_id],
@@ -97,9 +116,14 @@ def load_best_model(run_id: str | None = None):
             model_uri = f"runs:/{run.info.run_id}/model"
             model = mlflow.sklearn.load_model(model_uri)
             rmse = run.data.metrics.get("rmse", "N/A")
-            log.info(f"Loaded best model: {run.info.run_name} (run={run.info.run_id}, RMSE={rmse})")
+            log.info(
+                f"Loaded best model: {run.info.run_name} (run={run.info.run_id}, RMSE={rmse})"
+            )
             return model, run.info.run_id
-        except Exception:
+        except Exception as e:  # noqa: BLE001
+            log.warning(
+                f"Skipping run {run.info.run_id}: could not load sklearn model: {e}"
+            )
             continue
 
     raise RuntimeError("No sklearn model found in MLflow. Run train.py first.")
@@ -115,7 +139,9 @@ def fetch_inference_data() -> pd.DataFrame:
     entity_df["event_timestamp"] = pd.to_datetime(entity_df["event_timestamp"])
 
     feature_service = store.get_feature_service(FEATURE_SERVICE)
-    log.info(f"Fetching feature service '{FEATURE_SERVICE}' for {len(entity_df)} blocks...")
+    log.info(
+        f"Fetching feature service '{FEATURE_SERVICE}' for {len(entity_df)} blocks..."
+    )
     df = store.get_historical_features(
         entity_df=entity_df,
         features=feature_service,
@@ -129,7 +155,9 @@ def fetch_online_data(block_ids: list[str]) -> pd.DataFrame:
     """Fetch features from the Feast ONLINE store for the given block_ids."""
     store = FeatureStore(repo_path=str(FEAST_REPO))
     feature_service = store.get_feature_service(FEATURE_SERVICE)
-    log.info(f"Fetching online feature service '{FEATURE_SERVICE}' for {len(block_ids)} block(s)...")
+    log.info(
+        f"Fetching online feature service '{FEATURE_SERVICE}' for {len(block_ids)} block(s)..."
+    )
     df = store.get_online_features(
         features=feature_service,
         entity_rows=[{"block_id": b} for b in block_ids],
@@ -167,11 +195,13 @@ def predict(model, df: pd.DataFrame) -> pd.DataFrame:
     log.info(f"Running predictions on {len(X)} rows...")
     preds = model.predict(X)
 
-    result = pd.DataFrame({
-        "event_timestamp": timestamps,
-        "block_id": block_ids,
-        "predicted_dam_mcp": np.ravel(preds),
-    })
+    result = pd.DataFrame(
+        {
+            "event_timestamp": timestamps,
+            "block_id": block_ids,
+            "predicted_dam_mcp": np.ravel(preds),
+        }
+    )
 
     if actuals is not None:
         result["actual_dam_mcp"] = actuals.values
@@ -190,10 +220,12 @@ def main():
     log.info("=" * 55)
 
     if args.online and not args.block_id:
-        raise SystemExit("--online requires at least one --block-id (e.g. --block-id 2025-03-20T18:00)")
+        raise SystemExit(
+            "--online requires at least one --block-id (e.g. --block-id 2025-03-20T18:00)"
+        )
 
     # 1. Load model
-    model, run_id = load_best_model(args.run_id)
+    model, _run_id = load_best_model(args.run_id)
 
     # 2. Fetch features (online store by block_id, or offline snapshot)
     if args.online:
@@ -206,7 +238,9 @@ def main():
 
     # 4. Save output
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    output_path = Path(args.output) if args.output else OUTPUT_DIR / "batch_predictions.csv"
+    output_path = (
+        Path(args.output) if args.output else OUTPUT_DIR / "batch_predictions.csv"
+    )
     results.to_csv(output_path, index=False)
     log.info(f"Predictions saved: {output_path} ({len(results)} rows)")
 
@@ -219,10 +253,16 @@ def main():
     log.info(f"  Max:    {results['predicted_dam_mcp'].max():.2f}")
 
     if "actual_dam_mcp" in results.columns:
-        from sklearn.metrics import mean_absolute_error, mean_squared_error
         import math
-        rmse = math.sqrt(mean_squared_error(results["actual_dam_mcp"], results["predicted_dam_mcp"]))
-        mae = mean_absolute_error(results["actual_dam_mcp"], results["predicted_dam_mcp"])
+
+        from sklearn.metrics import mean_absolute_error, mean_squared_error
+
+        rmse = math.sqrt(
+            mean_squared_error(results["actual_dam_mcp"], results["predicted_dam_mcp"])
+        )
+        mae = mean_absolute_error(
+            results["actual_dam_mcp"], results["predicted_dam_mcp"]
+        )
         log.info(f"  RMSE:   {rmse:.4f}")
         log.info(f"  MAE:    {mae:.4f}")
 

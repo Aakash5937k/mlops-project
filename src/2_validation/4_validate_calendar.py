@@ -10,11 +10,11 @@ Can also be run standalone for testing:
   python src/2_validation/4_validate_calendar.py --date 2026-03-23 --mode local
 """
 
-import os
 import json
 import logging
+import os
+from datetime import UTC, datetime
 from pathlib import Path
-from datetime import datetime
 
 import pandas as pd
 
@@ -60,7 +60,7 @@ def load(date_str: str, mode: str, s3=None) -> pd.DataFrame:
             df = df[df["date"] == date_str]
             log.info(f"CALENDAR loaded {len(df)} rows from s3://{S3_BUCKET}/{key}")
             return df
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             log.warning(f"CALENDAR silver not found in S3: {key} ({e})")
             return pd.DataFrame()
 
@@ -99,7 +99,7 @@ def validate(context, df: pd.DataFrame) -> dict:
             "invalid_count": len(failing),
         }
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         log.error(f"CALENDAR validation error: {e}")
         return {
             "success": False,
@@ -124,7 +124,7 @@ def split(df: pd.DataFrame, ge_result: dict, run_id: str):
     valid_df = df.loc[df.index.isin(passing)].copy()
     invalid_df = df.loc[df.index.isin(failing)].copy()
 
-    valid_df["validated_at"] = datetime.utcnow().isoformat()
+    valid_df["validated_at"] = datetime.now(UTC).isoformat()
     valid_df["validation_run_id"] = run_id
 
     if not invalid_df.empty:
@@ -134,7 +134,7 @@ def split(df: pd.DataFrame, ge_result: dict, run_id: str):
         invalid_df["failed_expectations"] = invalid_df.index.map(
             lambda i: json.dumps(reasons.get(i, []))
         )
-        invalid_df["flagged_at"] = datetime.utcnow().isoformat()
+        invalid_df["flagged_at"] = datetime.now(UTC).isoformat()
         invalid_df["validation_run_id"] = run_id
         invalid_df["reviewed"] = False
 
@@ -158,7 +158,9 @@ def save(df: pd.DataFrame, date_str: str, kind: str, mode: str, s3=None):
             df = pd.concat([existing, df], ignore_index=True)
             df = df.sort_values("date").reset_index(drop=True)
         df.to_parquet(path, index=False, compression="snappy")
-        log.info(f"CALENDAR {kind} saved: {path.relative_to(PROJECT_ROOT)} ({len(df)} rows total)")
+        log.info(
+            f"CALENDAR {kind} saved: {path.relative_to(PROJECT_ROOT)} ({len(df)} rows total)"
+        )
 
     else:
         import io as _io
@@ -189,7 +191,7 @@ def save_postgres(valid_df, invalid_df, engine):
                 chunksize=500,
             )
             log.info(f"CALENDAR saved to Postgres {table} ({len(df)} rows)")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             log.error(f"CALENDAR Postgres write failed [{table}]: {e}")
 
 
@@ -201,7 +203,7 @@ def run(context, date_str: str, mode: str, run_id: str, engine=None, s3=None) ->
     Full CALENDAR validation pipeline.
     Called by gx_validate.py with shared context, engine, s3 client.
     """
-    started = datetime.utcnow()
+    started = datetime.now(UTC)
 
     df = load(date_str, mode, s3)
     if df.empty:
@@ -212,7 +214,7 @@ def run(context, date_str: str, mode: str, run_id: str, engine=None, s3=None) ->
             "valid_count": 0,
             "invalid_count": 0,
             "started_at": started.isoformat(),
-            "completed_at": datetime.utcnow().isoformat(),
+            "completed_at": datetime.now(UTC).isoformat(),
             "duration_s": 0,
         }
 
@@ -225,7 +227,7 @@ def run(context, date_str: str, mode: str, run_id: str, engine=None, s3=None) ->
     if engine:
         save_postgres(valid_df, invalid_df, engine)
 
-    completed = datetime.utcnow()
+    completed = datetime.now(UTC)
     return {
         "dataset": DATASET,
         "status": "SUCCESS" if ge_result["success"] else "PARTIAL_FAIL",
@@ -243,13 +245,14 @@ def run(context, date_str: str, mode: str, run_id: str, engine=None, s3=None) ->
 # ─────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     import argparse
-    from dotenv import load_dotenv
+
     import great_expectations as gx
+    from dotenv import load_dotenv
 
     load_dotenv()
 
     p = argparse.ArgumentParser()
-    p.add_argument("--date", default=datetime.today().strftime("%Y-%m-%d"))
+    p.add_argument("--date", default=datetime.now().astimezone().strftime("%Y-%m-%d"))
     p.add_argument("--mode", default="local", choices=["local", "cloud"])
     args = build_args = p.parse_args()
 
@@ -264,8 +267,9 @@ if __name__ == "__main__":
 
     engine = s3 = None
     if args.mode == "cloud":
-        import boto3
         import os
+
+        import boto3
         from sqlalchemy import create_engine
 
         s3 = boto3.client(

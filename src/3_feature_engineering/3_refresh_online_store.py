@@ -19,11 +19,11 @@ Usage
   python src/3_feature_engineering/3_refresh_online_store.py --year 2025 --month 3
 """
 
-import sys
 import argparse
 import subprocess
-from pathlib import Path
+import sys
 from datetime import datetime
+from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 FEAST_REPO = PROJECT_ROOT / "my_feature_store" / "feature_repo"
@@ -36,8 +36,10 @@ def run(cmd, cwd=None, step=""):
     print("\n" + "=" * 70)
     print(banner.center(70, "="))
     print("=" * 70)
-    print(f"$ {' '.join(str(c) for c in cmd)}   (cwd={cwd or PROJECT_ROOT})\n", flush=True)
-    result = subprocess.run(cmd, cwd=str(cwd or PROJECT_ROOT))
+    print(
+        f"$ {' '.join(str(c) for c in cmd)}   (cwd={cwd or PROJECT_ROOT})\n", flush=True
+    )
+    result = subprocess.run(cmd, check=False, cwd=str(cwd or PROJECT_ROOT))
     if result.returncode != 0:
         print(f"\n[FAILED] step '{step}' exited {result.returncode}. Aborting refresh.")
         sys.exit(result.returncode)
@@ -45,36 +47,56 @@ def run(cmd, cwd=None, step=""):
 
 def main():
     p = argparse.ArgumentParser(prog="refresh_online_store.py")
-    p.add_argument("--year", type=int, default=2025, help="Year for build_features (default 2025)")
-    p.add_argument("--month", type=int, default=3, help="Month for build_features (default 3)")
+    p.add_argument(
+        "--year", type=int, default=2025, help="Year for build_features (default 2025)"
+    )
+    p.add_argument(
+        "--month", type=int, default=3, help="Month for build_features (default 3)"
+    )
     args = p.parse_args()
 
     print("Refreshing Feast online store from validated data")
     print(f"Project root: {PROJECT_ROOT}")
 
     # 1. Build the prepared feature table from validated data
-    run([PYTHON, "src/3_feature_engineering/1_build_features.py", "--year", str(args.year), "--month", str(args.month)],
-        step="build_features (validated -> prepared parquet)")
+    run(
+        [
+            PYTHON,
+            "src/3_feature_engineering/1_build_features.py",
+            "--year",
+            str(args.year),
+            "--month",
+            str(args.month),
+        ],
+        step="build_features (validated -> prepared parquet)",
+    )
 
     # 2. Prepare the Feast source parquet (dedup by block_id, add event_timestamp)
-    run([PYTHON, "src/3_feature_engineering/2_prepare_feast_data.py"],
-        step="prepare_feast_data (-> Feast source parquet)")
+    run(
+        [PYTHON, "src/3_feature_engineering/2_prepare_feast_data.py"],
+        step="prepare_feast_data (-> Feast source parquet)",
+    )
 
     # 3. Register feature views + sync the registry
     run(["feast", "apply"], cwd=FEAST_REPO, step="feast apply")
 
     # 4. Materialize offline -> online store (up to now)
     now = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-    run(["feast", "materialize-incremental", now], cwd=FEAST_REPO,
-        step=f"feast materialize-incremental {now}")
+    run(
+        ["feast", "materialize-incremental", now],
+        cwd=FEAST_REPO,
+        step=f"feast materialize-incremental {now}",
+    )
 
     print("\n" + "=" * 70)
     print(" ONLINE STORE REFRESH COMPLETE ".center(70, "="))
     print("=" * 70)
     print("Serve features by block_id, e.g.:")
     print("  python src/7_prediction/1_predict.py --online --block-id 2025-03-20T18:00")
-    print('  curl -X POST localhost:8000/predict -H "Content-Type: application/json" '
-          '-d \'{"block_id":"2025-03-20T18:00"}\'')
+    print(
+        '  curl -X POST localhost:8000/predict -H "Content-Type: application/json" '
+        '-d \'{"block_id":"2025-03-20T18:00"}\''
+    )
 
 
 if __name__ == "__main__":

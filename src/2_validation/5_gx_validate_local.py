@@ -25,23 +25,23 @@ Dependencies
   pip install great-expectations==0.17.22 pandas pyarrow sqlalchemy psycopg2-binary python-dotenv
 """
 
+import argparse
+import json
+import logging
 import os
 import sys
-import json
 import uuid
-import logging
-import argparse
+from datetime import date, datetime
 from pathlib import Path
-from datetime import datetime, date
 
+import great_expectations as gx
 import pandas as pd
 from dotenv import load_dotenv
-import great_expectations as gx
 from great_expectations.core.batch import RuntimeBatchRequest
 from great_expectations.core.run_identifier import RunIdentifier
 from great_expectations.data_context.types.resource_identifiers import (
-    ValidationResultIdentifier,
     ExpectationSuiteIdentifier,
+    ValidationResultIdentifier,
 )
 from sqlalchemy import create_engine, text
 
@@ -177,14 +177,18 @@ def load_silver(dataset: str, date_str: str) -> pd.DataFrame:
     elif dataset == "calendar":
         cal_path = LOCAL_SILVER / "calendar" / "calendar.parquet"
         if not cal_path.exists():
-            log.warning(f"  Calendar Silver not found: {cal_path.relative_to(PROJECT_ROOT)}")
+            log.warning(
+                f"  Calendar Silver not found: {cal_path.relative_to(PROJECT_ROOT)}"
+            )
             return pd.DataFrame()
         df = pd.read_parquet(cal_path)
         df = df[df["date"] == date_str]
         if df.empty:
             log.warning(f"  No calendar data for {date_str}")
             return pd.DataFrame()
-        log.info(f"  Loaded {len(df)} rows from {cal_path.relative_to(PROJECT_ROOT)} for {date_str}")
+        log.info(
+            f"  Loaded {len(df)} rows from {cal_path.relative_to(PROJECT_ROOT)} for {date_str}"
+        )
         return df
 
     else:
@@ -207,7 +211,9 @@ def load_silver(dataset: str, date_str: str) -> pd.DataFrame:
 # ─────────────────────────────────────────────────────────────
 # RUN GE VALIDATION
 # ─────────────────────────────────────────────────────────────
-from datetime import datetime, timezone
+from datetime import UTC
+
+
 def run_validation(context, df: pd.DataFrame, dataset: str, date_str: str) -> dict:
     """
     Validate DataFrame against the dataset suite.
@@ -239,7 +245,7 @@ def run_validation(context, df: pd.DataFrame, dataset: str, date_str: str) -> di
 
         # Save result to GE validations store so Data Docs shows it
         try:
-            run_name = f"{dataset}__{date_str}__{datetime.now(timezone.utc).strftime('%H%M%S')}"
+            run_name = f"{dataset}__{date_str}__{datetime.now(UTC).strftime('%H%M%S')}"
             vid = ValidationResultIdentifier(
                 expectation_suite_identifier=ExpectationSuiteIdentifier(
                     expectation_suite_name=suite_name
@@ -250,7 +256,7 @@ def run_validation(context, df: pd.DataFrame, dataset: str, date_str: str) -> di
             context.validations_store.set(vid, result)
             context.build_data_docs()
             log.info(f"  Data Docs updated — run: {run_name}")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             log.warning(f"  Data Docs update skipped: {e}")
 
         # Collect failing rows
@@ -275,7 +281,7 @@ def run_validation(context, df: pd.DataFrame, dataset: str, date_str: str) -> di
             "invalid_count": len(failing),
         }
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         log.error(f"  Validation error: {e}")
         return {
             "success": False,
@@ -299,7 +305,7 @@ def split_rows(df: pd.DataFrame, result: dict):
     valid_df = df.loc[df.index.isin(passing)].copy()
     invalid_df = df.loc[df.index.isin(failing)].copy()
 
-    valid_df["validated_at"] = datetime.now(timezone.utc).isoformat()
+    valid_df["validated_at"] = datetime.now(UTC).isoformat()
     valid_df["validation_run_id"] = RUN_ID
 
     if not invalid_df.empty:
@@ -309,7 +315,7 @@ def split_rows(df: pd.DataFrame, result: dict):
         invalid_df["failed_expectations"] = invalid_df.index.map(
             lambda i: json.dumps(reasons.get(i, []))
         )
-        invalid_df["flagged_at"] = datetime.now(timezone.utc).isoformat()
+        invalid_df["flagged_at"] = datetime.now(UTC).isoformat()
         invalid_df["validation_run_id"] = RUN_ID
         invalid_df["reviewed"] = False
 
@@ -349,7 +355,7 @@ def save_parquet(df: pd.DataFrame, dataset: str, date_str: str, kind: str):
         path.parent.mkdir(parents=True, exist_ok=True)
         df.to_parquet(path, index=False, compression="snappy")
         log.info(
-            f"  Saved {kind} parquet: " f"{path.relative_to(PROJECT_ROOT)} ({len(df)} rows)"
+            f"  Saved {kind} parquet: {path.relative_to(PROJECT_ROOT)} ({len(df)} rows)"
         )
 
 
@@ -386,7 +392,7 @@ def save_postgres(df: pd.DataFrame, table: str, date_str: str):
             chunksize=500,
         )
         log.info(f"  Saved to Postgres {table} ({len(pg_df)} rows)")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         log.error(f"  Postgres write failed [{table}]: {e}")
 
 
@@ -430,7 +436,7 @@ def log_run(dataset: str, result: dict):
                     "triggered_by": "manual",
                 },
             )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         log.warning(f"  pipeline_runs log failed: {e}")
 
 
@@ -438,9 +444,9 @@ def log_run(dataset: str, result: dict):
 # VALIDATE ONE DATASET
 # ─────────────────────────────────────────────────────────────
 def validate_dataset(context, dataset: str, date_str: str) -> dict:
-    from src.lineage import lineage_run, ds
+    from src.lineage import ds, lineage_run
 
-    started = datetime.now(timezone.utc)
+    started = datetime.now(UTC)
     log.info(f"\n--- {dataset.upper()} ---")
 
     df = load_silver(dataset, date_str)
@@ -454,11 +460,12 @@ def validate_dataset(context, dataset: str, date_str: str) -> dict:
             "valid_count": 0,
             "invalid_count": 0,
             "started_at": started.isoformat(),
-            "completed_at": datetime.now(timezone.utc).isoformat(),
+            "completed_at": datetime.now(UTC).isoformat(),
             "duration_s": 0,
         }
 
-    with lineage_run(f"validate_{dataset}",
+    with lineage_run(
+        f"validate_{dataset}",
         inputs=[ds(f"data/processed/{dataset}")],
         outputs=[
             ds(f"data/validated/{dataset}/valid"),
@@ -473,7 +480,7 @@ def validate_dataset(context, dataset: str, date_str: str) -> dict:
         save_postgres(valid_df, f"{dataset}_valid", date_str)
         save_postgres(invalid_df, f"{dataset}_invalid", date_str)
 
-    completed = datetime.now(timezone.utc)
+    completed = datetime.now(UTC)
     result = {
         "dataset": dataset,
         "date": date_str,
@@ -499,11 +506,12 @@ def validate_dataset(context, dataset: str, date_str: str) -> dict:
 # PRINT REPORT
 # ─────────────────────────────────────────────────────────────
 
+
 def print_report(all_results: dict, date_str: str):
     log.info(f"\n{'=' * 50}")
     log.info(f"  REPORT  {date_str}  LOCAL")
     log.info(f"  {'Dataset':12s} {'Total':>7s} {'Valid':>7s} {'Invalid':>9s}  Status")
-    log.info(f"  {'-'*12} {'-'*7} {'-'*7} {'-'*9}  {'-'*14}")
+    log.info(f"  {'-' * 12} {'-' * 7} {'-' * 7} {'-' * 9}  {'-' * 14}")
 
     grand_valid = grand_invalid = 0
     for ds, r in all_results.items():
@@ -515,7 +523,7 @@ def print_report(all_results: dict, date_str: str):
         grand_valid += r["valid_count"]
         grand_invalid += r["invalid_count"]
 
-    log.info(f"  {'-'*12} {'-'*7} {'-'*7} {'-'*9}")
+    log.info(f"  {'-' * 12} {'-' * 7} {'-' * 7} {'-' * 9}")
     log.info(
         f"  {'TOTAL':12s} "
         f"{grand_valid + grand_invalid:>7d} "
@@ -532,7 +540,7 @@ def print_report(all_results: dict, date_str: str):
                 "run_id": RUN_ID,
                 "date": date_str,
                 "mode": "local",
-                "run_at": datetime.now(timezone.utc).isoformat(),
+                "run_at": datetime.now(UTC).isoformat(),
                 "results": all_results,
             },
             indent=2,
@@ -585,7 +593,7 @@ def main():
         context = gx.DataContext(context_root_dir=str(GE_ROOT))
         log.info("GE context loaded")
         log.info(f"Suites: {context.list_expectation_suite_names()}")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         log.error(f"GE context failed: {e}")
         return
 
@@ -604,7 +612,7 @@ def main():
         for ds in to_run:
             try:
                 all_results[ds] = validate_dataset(context, ds, date_str)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 log.error(f"{ds} crashed: {e}")
                 all_results[ds] = {
                     "dataset": ds,
@@ -614,8 +622,8 @@ def main():
                     "total": 0,
                     "valid_count": 0,
                     "invalid_count": 0,
-                    "started_at": datetime.now(timezone.utc).isoformat(),
-                    "completed_at": datetime.now(timezone.utc).isoformat(),
+                    "started_at": datetime.now(UTC).isoformat(),
+                    "completed_at": datetime.now(UTC).isoformat(),
                     "duration_s": 0,
                 }
         print_report(all_results, date_str)

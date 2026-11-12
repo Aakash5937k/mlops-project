@@ -27,11 +27,11 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
-from evidently import Dataset, DataDefinition, Report
+from evidently import DataDefinition, Dataset, Report
 from evidently.presets import DataDriftPreset
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -39,17 +39,43 @@ REFERENCE_PATH = PROJECT_ROOT / "drift_baselines" / "reference_data.parquet"
 DRIFT_REPORT_PATH = PROJECT_ROOT / "monitoring" / "drift_summary.json"
 
 FEATURES = [
-    "dam_purchase_bid", "dam_sell_bid", "dam_mcv", "dam_volume",
-    "dam_bid_imbalance", "rtm_purchase_bid", "rtm_sell_bid",
-    "rtm_mcv", "rtm_volume", "mcp_spread",
-    "dam_mcp_lag_1d", "dam_mcp_lag_2d", "dam_mcp_lag_7d",
-    "dam_mcp_roll_4h", "dam_mcp_roll_24h", "dam_mcp_roll_std_24h",
-    "avg_temp", "avg_humidity", "avg_windspeed",
-    "avg_cloud_cover", "total_rainfall",
-    "hour_sin", "hour_cos", "dow_sin", "dow_cos",
-    "block_sin", "block_cos", "day_of_month",
-    "is_weekend", "is_peak_hour", "is_morning_ramp", "is_off_peak",
-    "is_ipl_match", "is_event", "is_festival", "is_wedding_season", "impact",
+    "dam_purchase_bid",
+    "dam_sell_bid",
+    "dam_mcv",
+    "dam_volume",
+    "dam_bid_imbalance",
+    "rtm_purchase_bid",
+    "rtm_sell_bid",
+    "rtm_mcv",
+    "rtm_volume",
+    "mcp_spread",
+    "dam_mcp_lag_1d",
+    "dam_mcp_lag_2d",
+    "dam_mcp_lag_7d",
+    "dam_mcp_roll_4h",
+    "dam_mcp_roll_24h",
+    "dam_mcp_roll_std_24h",
+    "avg_temp",
+    "avg_humidity",
+    "avg_windspeed",
+    "avg_cloud_cover",
+    "total_rainfall",
+    "hour_sin",
+    "hour_cos",
+    "dow_sin",
+    "dow_cos",
+    "block_sin",
+    "block_cos",
+    "day_of_month",
+    "is_weekend",
+    "is_peak_hour",
+    "is_morning_ramp",
+    "is_off_peak",
+    "is_ipl_match",
+    "is_event",
+    "is_festival",
+    "is_wedding_season",
+    "impact",
 ]
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [DRIFT] %(message)s")
@@ -66,7 +92,9 @@ def load_reference() -> pd.DataFrame:
     return pd.read_parquet(REFERENCE_PATH)
 
 
-def run_drift_check(current_df: pd.DataFrame, reference_df: pd.DataFrame = None) -> dict:
+def run_drift_check(
+    current_df: pd.DataFrame, reference_df: pd.DataFrame = None
+) -> dict:
     """
     Run drift detection comparing current data against reference data.
 
@@ -81,24 +109,39 @@ def run_drift_check(current_df: pd.DataFrame, reference_df: pd.DataFrame = None)
         reference_df = load_reference()
 
     # Use only features present in both datasets
-    common_features = [f for f in FEATURES if f in current_df.columns and f in reference_df.columns]
+    common_features = [
+        f for f in FEATURES if f in current_df.columns and f in reference_df.columns
+    ]
 
     if len(common_features) < 5:
-        log.warning("Too few common features (%d). Skipping drift check.", len(common_features))
+        log.warning(
+            "Too few common features (%d). Skipping drift check.", len(common_features)
+        )
         return {"dataset_drift": False, "error": "Too few common features"}
 
     # Filter out constant columns (zero variance breaks K-S test)
-    varying_features = [f for f in common_features
-                        if reference_df[f].nunique() > 1 and current_df[f].nunique() > 1]
+    varying_features = [
+        f
+        for f in common_features
+        if reference_df[f].nunique() > 1 and current_df[f].nunique() > 1
+    ]
     skipped = set(common_features) - set(varying_features)
     if skipped:
-        log.info("Skipping %d constant features: %s", len(skipped), ", ".join(sorted(skipped)))
+        log.info(
+            "Skipping %d constant features: %s",
+            len(skipped),
+            ", ".join(sorted(skipped)),
+        )
 
     ref_data = reference_df[varying_features].copy()
     cur_data = current_df[varying_features].copy()
 
-    log.info("Running drift check: %d reference rows vs %d current rows, %d features",
-             len(ref_data), len(cur_data), len(varying_features))
+    log.info(
+        "Running drift check: %d reference rows vs %d current rows, %d features",
+        len(ref_data),
+        len(cur_data),
+        len(varying_features),
+    )
 
     # Build Evidently datasets
     data_def = DataDefinition(numerical_columns=varying_features)
@@ -158,17 +201,20 @@ def run_drift_check(current_df: pd.DataFrame, reference_df: pd.DataFrame = None)
         "dataset_drift": dataset_drift,
         "drifted_features_count": len(drifted_features),
         "total_features": len(common_features),
-        "drift_share": round(len(drifted_features) / len(common_features), 4) if common_features else 0,
+        "drift_share": round(len(drifted_features) / len(common_features), 4)
+        if common_features
+        else 0,
         "drifted_features": drifted_features,
         "feature_details": feature_details,
         "reference_rows": len(ref_data),
         "current_rows": len(cur_data),
-        "report_time": datetime.now(timezone.utc).isoformat(),
+        "report_time": datetime.now(UTC).isoformat(),
     }
 
     # Save to disk (convert numpy types for JSON serialization)
     def _convert(obj):
         import numpy as np
+
         if isinstance(obj, (np.bool_, bool)):
             return bool(obj)
         if isinstance(obj, (np.integer,)):
@@ -181,10 +227,13 @@ def run_drift_check(current_df: pd.DataFrame, reference_df: pd.DataFrame = None)
     with open(DRIFT_REPORT_PATH, "w") as f:
         json.dump(summary, f, indent=2, default=_convert)
 
-    log.info("Drift result: %s | %d/%d features drifted (%.1f%%)",
-             "DRIFT DETECTED" if dataset_drift else "No drift",
-             len(drifted_features), len(common_features),
-             len(drifted_features) / len(common_features) * 100 if common_features else 0)
+    log.info(
+        "Drift result: %s | %d/%d features drifted (%.1f%%)",
+        "DRIFT DETECTED" if dataset_drift else "No drift",
+        len(drifted_features),
+        len(common_features),
+        len(drifted_features) / len(common_features) * 100 if common_features else 0,
+    )
 
     if drifted_features:
         log.info("Drifted features: %s", ", ".join(drifted_features))
@@ -194,7 +243,9 @@ def run_drift_check(current_df: pd.DataFrame, reference_df: pd.DataFrame = None)
 
 def main():
     parser = argparse.ArgumentParser(description="Run drift detection")
-    parser.add_argument("--current", required=True, help="Path to current data CSV or Parquet")
+    parser.add_argument(
+        "--current", required=True, help="Path to current data CSV or Parquet"
+    )
     args = parser.parse_args()
 
     path = Path(args.current)

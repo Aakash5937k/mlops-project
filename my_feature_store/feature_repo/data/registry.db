@@ -7,8 +7,8 @@ __dummy_idJmy_feature_store
 }
 _
 block_id715-minute time block identifier (e.g. 2025-03-15T14:30)"block_idJmy_feature_store
-‘øÏ×ˆœçN‘øÏ×ˆœçN1"$d35b524f-0ebc-4a0f-9cc7-57664e3b99e5*áĞ×ºÏÔ2ª
-º
+‘øÏ×ˆœçN‘øÏ×ˆœçN1"$e8a33441-3993-4a4c-b143-9965347601b4*ÔˆÖ×è¤ ú2÷
+‡
 market_featuresmy_feature_storeblock_id"
 dam_mcp"
 dam_purchase_bid"
@@ -29,27 +29,27 @@ mcp_spread"
 dam_mcp_lag_7d"
 dam_mcp_roll_4h"
 dam_mcp_roll_24h"
-dam_mcp_roll_std_24h2€ç„:«event_timestampZ" data/march_2025_features.parquetŠ1feast.infra.offline_stores.file_source.FileSource¢ data/march_2025_features.parquet’ŠáĞ×€ÿ’["ŠáĞ×€ÿ’[@b
+dam_mcp_roll_std_24h2€ç„:yevent_timestampZ" data/march_2025_features.parquet¢ data/march_2025_features.parquet’ÔˆÖ×ğŠ×á"ÔˆÖ×ğŠ×á@b
 block_id’latestk
-‘øÏ×èğêNáĞ×è©ùÀ
+‘øÏ×èğêNÔˆÖ×ØíÄù
 ¨•ËÈøæ¶ı–Ñ×
 €†Ó¾€©Ø¾
 ı–Ñ×şóÑ×
-şóÑ×âûÑ×02È
-Ø
+şóÑ×âûÑ×02•
+¥
 weather_featuresmy_feature_storeblock_id"
 avg_temp"
 avg_humidity"
 avg_windspeed"
 avg_cloud_cover"
-total_rainfall2€ç„:«event_timestampZ" data/march_2025_features.parquetŠ1feast.infra.offline_stores.file_source.FileSource¢ data/march_2025_features.parquet’ŠáĞ×€ÿ’["ŠáĞ×€ÿ’[@b
+total_rainfall2€ç„:yevent_timestampZ" data/march_2025_features.parquet¢ data/march_2025_features.parquet’ÔˆÖ×ğŠ×á"ÔˆÖ×ğŠ×á@b
 block_id’latestk
-‘øÏ×àş‚OáĞ× åÏÊ
+‘øÏ×àş‚OÔˆÖ×ÀŒçù
 ¨•ËÈ¨ûç¶ı–Ñ×
 €†Ó¾€©Ø¾
 ı–Ñ×şóÑ×
-şóÑ×âûÑ×02ï
-ÿ
+şóÑ×âûÑ×02¼
+Ì
 calendar_featuresmy_feature_storeblock_id"
 hour_sin"
 hour_cos"
@@ -68,9 +68,9 @@ is_weekend"
 is_festival"
 is_wedding_season"
 
-impact2€ç„:«event_timestampZ" data/march_2025_features.parquetŠ1feast.infra.offline_stores.file_source.FileSource¢ data/march_2025_features.parquet’ŠáĞ×€ÿ’["ŠáĞ×€ÿ’[@b
+impact2€ç„:yevent_timestampZ" data/march_2025_features.parquet¢ data/march_2025_features.parquet’ÔˆÖ×ğŠ×á"ÔˆÖ×ğŠ×á@b
 block_id’latestk
-‘øÏ×€ôOáĞ×˜ˆÃÔ
+‘øÏ×€ôOÔˆÖ×ˆÖšú
 ¨•ËÈàé¶ı–Ñ×
 €†Ó¾€©Ø¾
 ı–Ñ×şóÑ×

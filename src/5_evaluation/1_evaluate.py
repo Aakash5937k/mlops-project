@@ -34,6 +34,7 @@ import tempfile
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import mlflow
@@ -53,7 +54,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.splits import resolve_split, split_bounds  # noqa: E402
+from src.splits import resolve_split, split_bounds
 
 FEAST_REPO = PROJECT_ROOT / "my_feature_store" / "feature_repo"
 METRICS_PATH = PROJECT_ROOT / "metrics.json"
@@ -74,28 +75,49 @@ logging.getLogger("feast").setLevel(logging.WARNING)
 
 # -- CLI ---------------------------------------------------------------------
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Evaluate best model and gate promotion")
-    parser.add_argument("--val-size", type=float, default=None,
-                        help="Override the validation fraction. Defaults to the split "
-                             "recorded in metrics.json by the training run.")
-    parser.add_argument("--test-size", type=float, default=None,
-                        help="Override the test fraction. Defaults to the split "
-                             "recorded in metrics.json by the training run.")
-    parser.add_argument("--rmse-threshold", type=float, default=None,
-                        help="Max acceptable RMSE. If exceeded, model fails evaluation.")
-    parser.add_argument("--mape-threshold", type=float, default=None,
-                        help="Max acceptable MAPE (percent). If exceeded, model fails evaluation.")
+    parser = argparse.ArgumentParser(
+        description="Evaluate best model and gate promotion"
+    )
+    parser.add_argument(
+        "--val-size",
+        type=float,
+        default=None,
+        help="Override the validation fraction. Defaults to the split "
+        "recorded in metrics.json by the training run.",
+    )
+    parser.add_argument(
+        "--test-size",
+        type=float,
+        default=None,
+        help="Override the test fraction. Defaults to the split "
+        "recorded in metrics.json by the training run.",
+    )
+    parser.add_argument(
+        "--rmse-threshold",
+        type=float,
+        default=None,
+        help="Max acceptable RMSE. If exceeded, model fails evaluation.",
+    )
+    parser.add_argument(
+        "--mape-threshold",
+        type=float,
+        default=None,
+        help="Max acceptable MAPE (percent). If exceeded, model fails evaluation.",
+    )
     return parser.parse_args()
 
 
 # -- Load best model from MLflow ---------------------------------------------
 REGISTERED_MODEL_NAME = "dam_mcp_forecast"
 
+
 def _get_proxy_host():
     """Extract host:port from tracking URI for artifact proxy."""
     from urllib.parse import urlparse
+
     parsed = urlparse(MLFLOW_TRACKING_URI)
     return f"{parsed.hostname}:{parsed.port}"
+
 
 def load_best_model():
     """Load the latest version of the registered model from MLflow.
@@ -109,7 +131,9 @@ def load_best_model():
     # Get latest model version from registry
     versions = client.search_model_versions(f"name='{REGISTERED_MODEL_NAME}'")
     if not versions:
-        raise RuntimeError(f"No model versions for '{REGISTERED_MODEL_NAME}'. Run train.py first.")
+        raise RuntimeError(
+            f"No model versions for '{REGISTERED_MODEL_NAME}'. Run train.py first."
+        )
     latest = max(versions, key=lambda v: int(v.version))
     run_id = latest.run_id
 
@@ -118,7 +142,7 @@ def load_best_model():
     log.info(f"Loading model: {model_uri}")
     try:
         model = mlflow.sklearn.load_model(model_uri)
-    except Exception:
+    except Exception:  # noqa: BLE001
         # Fallback: load from the run's artifact path
         run_uri = f"runs:/{run_id}/model"
         log.info(f"Falling back to run artifact: {run_uri}")
@@ -127,8 +151,10 @@ def load_best_model():
     run = client.get_run(run_id)
     run_name = run.info.run_name
     rmse = run.data.metrics.get("rmse", "N/A")
-    log.info(f"Loaded model: {REGISTERED_MODEL_NAME} v{latest.version} "
-             f"(run={run_name}, id={run_id}, train_RMSE={rmse})")
+    log.info(
+        f"Loaded model: {REGISTERED_MODEL_NAME} v{latest.version} "
+        f"(run={run_name}, id={run_id}, train_RMSE={rmse})"
+    )
     return model, run_id, run_name, latest.version
 
 
@@ -147,7 +173,9 @@ def fetch_and_split(val_size_override: float | None, test_size_override: float |
     entity_df["event_timestamp"] = pd.to_datetime(entity_df["event_timestamp"])
 
     feature_service = store.get_feature_service(FEATURE_SERVICE)
-    log.info(f"Fetching feature service '{FEATURE_SERVICE}' for {len(entity_df)} blocks from Feast...")
+    log.info(
+        f"Fetching feature service '{FEATURE_SERVICE}' for {len(entity_df)} blocks from Feast..."
+    )
     df = store.get_historical_features(
         entity_df=entity_df,
         features=feature_service,
@@ -173,8 +201,10 @@ def fetch_and_split(val_size_override: float | None, test_size_override: float |
     y_test = y.iloc[test_start:]
     ts_test = df[TIMESTAMP_COL].iloc[test_start:]
 
-    log.info(f"Holdout test set: {len(X_test)} rows (last {test_size*100:.0f}% by time), "
-             f"unseen by training and model selection")
+    log.info(
+        f"Holdout test set: {len(X_test)} rows (last {test_size * 100:.0f}% by time), "
+        f"unseen by training and model selection"
+    )
     return X_test, y_test, ts_test
 
 
@@ -248,24 +278,33 @@ def log_eval_plots(y_true, y_pred, timestamps):
 
 
 # -- Quality gate ------------------------------------------------------------
-def check_thresholds(metrics: dict, rmse_threshold: float | None,
-                     mape_threshold: float | None) -> bool:
+def check_thresholds(
+    metrics: dict, rmse_threshold: float | None, mape_threshold: float | None
+) -> bool:
     """Return True if model passes all quality gates."""
     passed = True
 
     if rmse_threshold is not None:
         if metrics["eval_rmse"] > rmse_threshold:
-            log.warning(f"FAILED: RMSE {metrics['eval_rmse']:.4f} > threshold {rmse_threshold}")
+            log.warning(
+                f"FAILED: RMSE {metrics['eval_rmse']:.4f} > threshold {rmse_threshold}"
+            )
             passed = False
         else:
-            log.info(f"PASSED: RMSE {metrics['eval_rmse']:.4f} <= threshold {rmse_threshold}")
+            log.info(
+                f"PASSED: RMSE {metrics['eval_rmse']:.4f} <= threshold {rmse_threshold}"
+            )
 
     if mape_threshold is not None:
         if metrics["eval_mape"] > mape_threshold:
-            log.warning(f"FAILED: MAPE {metrics['eval_mape']:.2f}% > threshold {mape_threshold}%")
+            log.warning(
+                f"FAILED: MAPE {metrics['eval_mape']:.2f}% > threshold {mape_threshold}%"
+            )
             passed = False
         else:
-            log.info(f"PASSED: MAPE {metrics['eval_mape']:.2f}% <= threshold {mape_threshold}%")
+            log.info(
+                f"PASSED: MAPE {metrics['eval_mape']:.2f}% <= threshold {mape_threshold}%"
+            )
 
     if rmse_threshold is None and mape_threshold is None:
         log.info("No thresholds set — model passes by default.")
@@ -275,7 +314,7 @@ def check_thresholds(metrics: dict, rmse_threshold: float | None,
 
 # -- Main --------------------------------------------------------------------
 def main():
-    from src.lineage import lineage_run, ds
+    from src.lineage import ds, lineage_run
 
     args = parse_args()
 
@@ -283,7 +322,8 @@ def main():
     log.info("EVALUATION - DAM MCP Best Model")
     log.info("=" * 55)
 
-    with lineage_run("evaluate",
+    with lineage_run(
+        "evaluate",
         inputs=[ds("models/model.pkl"), ds("feast/march_2025_features.parquet")],
         outputs=[ds("eval_metrics.json")],
     ):
@@ -322,22 +362,34 @@ def main():
             # Set quality tags on the run (for backward compatibility)
             mlflow.set_tag("passed_eval", str(passed))
             mlflow.set_tag("eval_status", quality)
-            mlflow.set_tag("mlflow.note.content",
-                           f"Evaluation: {quality} | RMSE={metrics['eval_rmse']:.4f} "
-                           f"| MAPE={metrics['eval_mape']:.2f}% | R2={metrics['eval_r2']:.4f}")
+            mlflow.set_tag(
+                "mlflow.note.content",
+                f"Evaluation: {quality} | RMSE={metrics['eval_rmse']:.4f} "
+                f"| MAPE={metrics['eval_mape']:.2f}% | R2={metrics['eval_r2']:.4f}",
+            )
 
             # Log eval plots as artifacts
             log_eval_plots(y_test, y_pred, ts_test)
 
         # Tag the model version directly in the registry
-        client.set_model_version_tag(REGISTERED_MODEL_NAME, str(model_version),
-                                     "passed_eval", str(passed))
-        client.set_model_version_tag(REGISTERED_MODEL_NAME, str(model_version),
-                                     "eval_status", quality)
-        client.set_model_version_tag(REGISTERED_MODEL_NAME, str(model_version),
-                                     "eval_rmse", f"{metrics['eval_rmse']:.4f}")
-        client.set_model_version_tag(REGISTERED_MODEL_NAME, str(model_version),
-                                     "eval_mape", f"{metrics['eval_mape']:.2f}")
+        client.set_model_version_tag(
+            REGISTERED_MODEL_NAME, str(model_version), "passed_eval", str(passed)
+        )
+        client.set_model_version_tag(
+            REGISTERED_MODEL_NAME, str(model_version), "eval_status", quality
+        )
+        client.set_model_version_tag(
+            REGISTERED_MODEL_NAME,
+            str(model_version),
+            "eval_rmse",
+            f"{metrics['eval_rmse']:.4f}",
+        )
+        client.set_model_version_tag(
+            REGISTERED_MODEL_NAME,
+            str(model_version),
+            "eval_mape",
+            f"{metrics['eval_mape']:.2f}",
+        )
 
         log.info(f"Logged eval metrics and plots to training run {run_id}")
         log.info(f"Tagged model version v{model_version} in registry: {quality}")

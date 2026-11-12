@@ -30,10 +30,10 @@ Dependencies
   pip install pandas pyarrow
 """
 
-import sys
-import glob
 import argparse
+import glob
 import logging
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -55,22 +55,48 @@ META_COLS = ["ingestion_date", "source_file", "pipeline_run_id"]
 # Final model features (order matters — must match feature_definitions.py / app)
 FEATURE_COLS = [
     # Time
-    "hour_sin", "hour_cos", "dow_sin", "dow_cos",
-    "block_sin", "block_cos", "day_of_month",
-    "is_weekend", "is_peak_hour", "is_morning_ramp", "is_off_peak",
+    "hour_sin",
+    "hour_cos",
+    "dow_sin",
+    "dow_cos",
+    "block_sin",
+    "block_cos",
+    "day_of_month",
+    "is_weekend",
+    "is_peak_hour",
+    "is_morning_ramp",
+    "is_off_peak",
     # Market — DAM
-    "dam_purchase_bid", "dam_sell_bid", "dam_mcv", "dam_volume",
+    "dam_purchase_bid",
+    "dam_sell_bid",
+    "dam_mcv",
+    "dam_volume",
     "dam_bid_imbalance",
     # Market — RTM
-    "rtm_purchase_bid", "rtm_sell_bid", "rtm_mcv", "rtm_volume",
+    "rtm_purchase_bid",
+    "rtm_sell_bid",
+    "rtm_mcv",
+    "rtm_volume",
     "mcp_spread",
     # Lag / rolling MCP
-    "dam_mcp_lag_1d", "dam_mcp_lag_2d", "dam_mcp_lag_7d",
-    "dam_mcp_roll_4h", "dam_mcp_roll_24h", "dam_mcp_roll_std_24h",
+    "dam_mcp_lag_1d",
+    "dam_mcp_lag_2d",
+    "dam_mcp_lag_7d",
+    "dam_mcp_roll_4h",
+    "dam_mcp_roll_24h",
+    "dam_mcp_roll_std_24h",
     # Weather
-    "avg_temp", "avg_humidity", "avg_windspeed", "avg_cloud_cover", "total_rainfall",
+    "avg_temp",
+    "avg_humidity",
+    "avg_windspeed",
+    "avg_cloud_cover",
+    "total_rainfall",
     # Calendar (derived from text columns in clean_calendar)
-    "is_ipl_match", "is_event", "is_festival", "is_wedding_season", "impact",
+    "is_ipl_match",
+    "is_event",
+    "is_festival",
+    "is_wedding_season",
+    "impact",
 ]
 TARGET_COL = "dam_mcp"
 
@@ -104,14 +130,24 @@ def load_parquet(pattern: str) -> pd.DataFrame:
     if not files:
         raise FileNotFoundError(f"No files matched: {pattern}")
     df = pd.concat([pd.read_parquet(f) for f in sorted(files)], ignore_index=True)
-    log.info(f"  Loaded {len(files)} files -> {df.shape[0]:,} rows x {df.shape[1]} cols")
+    log.info(
+        f"  Loaded {len(files)} files -> {df.shape[0]:,} rows x {df.shape[1]} cols"
+    )
     return df
 
 
 def _valid_glob(dataset: str, year: int, month: str) -> str:
     if dataset == "calendar":
         return str(VALIDATED_DIR / "calendar" / "valid" / "calendar.parquet")
-    return str(VALIDATED_DIR / dataset / "valid" / f"year={year}" / f"month={month}" / "**" / "*.parquet")
+    return str(
+        VALIDATED_DIR
+        / dataset
+        / "valid"
+        / f"year={year}"
+        / f"month={month}"
+        / "**"
+        / "*.parquet"
+    )
 
 
 # ─────────────────────────────────────────────────────────────
@@ -129,14 +165,17 @@ def clean_market(df_raw: pd.DataFrame, market: str) -> pd.DataFrame:
     df.sort_values("Datetime", inplace=True)
     df.reset_index(drop=True, inplace=True)
 
-    df.rename(columns={
-        "MCP (Rs/MWh) *": f"{prefix}_mcp",
-        "Purchase Bid (MW)": f"{prefix}_purchase_bid",
-        "Sell Bid (MW)": f"{prefix}_sell_bid",
-        "MCV (MW)": f"{prefix}_mcv",
-        "Final Scheduled Volume (MW)": f"{prefix}_volume",
-        "Session ID": f"{prefix}_session_id",
-    }, inplace=True)
+    df.rename(
+        columns={
+            "MCP (Rs/MWh) *": f"{prefix}_mcp",
+            "Purchase Bid (MW)": f"{prefix}_purchase_bid",
+            "Sell Bid (MW)": f"{prefix}_sell_bid",
+            "MCV (MW)": f"{prefix}_mcv",
+            "Final Scheduled Volume (MW)": f"{prefix}_volume",
+            "Session ID": f"{prefix}_session_id",
+        },
+        inplace=True,
+    )
 
     # Dedup: RTM keeps Datetime+session, DAM keeps Datetime
     if market == "RTM":
@@ -151,8 +190,10 @@ def clean_market(df_raw: pd.DataFrame, market: str) -> pd.DataFrame:
     lower, upper = q1 - 3 * iqr, q3 + 3 * iqr
     n_out = int(((df[mcp_col] < lower) | (df[mcp_col] > upper)).sum())
     df[mcp_col] = df[mcp_col].clip(lower, upper)
-    log.info(f"  {market} cleaned: {df.shape[0]} rows, {n_out} MCP outliers capped "
-             f"to [{lower:.1f}, {upper:.1f}]")
+    log.info(
+        f"  {market} cleaned: {df.shape[0]} rows, {n_out} MCP outliers capped "
+        f"to [{lower:.1f}, {upper:.1f}]"
+    )
     return df
 
 
@@ -165,23 +206,38 @@ def clean_weather(df_raw: pd.DataFrame) -> pd.DataFrame:
     df = df.groupby("city_name", group_keys=False).apply(
         lambda g: g.sort_values("time").ffill().bfill()
     )
-    log.info(f"  Weather cleaned: {df.shape[0]} rows, {df['city_name'].nunique()} cities")
+    log.info(
+        f"  Weather cleaned: {df.shape[0]} rows, {df['city_name'].nunique()} cities"
+    )
     return df
 
 
 def clean_calendar(df_raw: pd.DataFrame) -> pd.DataFrame:
     """Drop metadata, parse date, fill text columns, derive boolean features."""
     df = df_raw.copy()
-    df.drop(columns=[c for c in META_COLS + ["validated_at", "validation_run_id"]
-                      if c in df.columns], inplace=True)
+    df.drop(
+        columns=[
+            c
+            for c in META_COLS + ["validated_at", "validation_run_id"]
+            if c in df.columns
+        ],
+        inplace=True,
+    )
     df["date"] = pd.to_datetime(df["date"])
     df.sort_values("date", inplace=True)
     df.reset_index(drop=True, inplace=True)
 
-    for col, fill in [("festival_name", "None"), ("event", "None"),
-                      ("election_type", "None"), ("wedding_season", "None"),
-                      ("TIME", ""), ("STADIUM", ""), ("location", ""),
-                      ("region", ""), ("impact", 1.0)]:
+    for col, fill in [
+        ("festival_name", "None"),
+        ("event", "None"),
+        ("election_type", "None"),
+        ("wedding_season", "None"),
+        ("TIME", ""),
+        ("STADIUM", ""),
+        ("location", ""),
+        ("region", ""),
+        ("impact", 1.0),
+    ]:
         if col in df.columns:
             df[col] = df[col].fillna(fill)
 
@@ -196,8 +252,14 @@ def clean_calendar(df_raw: pd.DataFrame) -> pd.DataFrame:
         df["is_wedding_season"] = (df["wedding_season"] != "None").astype(int)
 
     # Aggregate to one row per date (IPL double-headers etc.)
-    agg_dict = {"DAY": "first", "is_ipl_match": "max", "is_event": "max",
-                "is_festival": "max", "is_wedding_season": "max", "impact": "max"}
+    agg_dict = {
+        "DAY": "first",
+        "is_ipl_match": "max",
+        "is_event": "max",
+        "is_festival": "max",
+        "is_wedding_season": "max",
+        "impact": "max",
+    }
     agg_dict = {k: v for k, v in agg_dict.items() if k in df.columns}
     df = df.groupby("date").agg(agg_dict).reset_index()
 
@@ -210,25 +272,41 @@ def clean_calendar(df_raw: pd.DataFrame) -> pd.DataFrame:
 # ─────────────────────────────────────────────────────────────
 def aggregate_weather(weather: pd.DataFrame) -> pd.DataFrame:
     """Aggregate all cities to India-level hourly stats. Cell 4.4."""
-    agg = weather.groupby("time").agg(
-        avg_temp=("temperature", "mean"),
-        max_temp=("temperature", "max"),
-        min_temp=("temperature", "min"),
-        avg_humidity=("humidity", "mean"),
-        avg_windspeed=("windspeed_100m", "mean"),
-        avg_cloud_cover=("cloud_cover", "mean"),
-        total_rainfall=("rainfall", "sum"),
-    ).reset_index()
+    agg = (
+        weather.groupby("time")
+        .agg(
+            avg_temp=("temperature", "mean"),
+            max_temp=("temperature", "max"),
+            min_temp=("temperature", "min"),
+            avg_humidity=("humidity", "mean"),
+            avg_windspeed=("windspeed_100m", "mean"),
+            avg_cloud_cover=("cloud_cover", "mean"),
+            total_rainfall=("rainfall", "sum"),
+        )
+        .reset_index()
+    )
     agg.rename(columns={"time": "hour_ts"}, inplace=True)
     return agg
 
 
-def build_spine(dam: pd.DataFrame, rtm: pd.DataFrame, weather_agg: pd.DataFrame,
-                calendar: pd.DataFrame) -> pd.DataFrame:
+def build_spine(
+    dam: pd.DataFrame,
+    rtm: pd.DataFrame,
+    weather_agg: pd.DataFrame,
+    calendar: pd.DataFrame,
+) -> pd.DataFrame:
     """Build 15-min DAM spine and join RTM, weather, calendar. Cells 5.1–5.4."""
     # 5.1 — DAM spine
-    spine = dam[["Datetime", "dam_mcp", "dam_purchase_bid", "dam_sell_bid",
-                 "dam_mcv", "dam_volume"]].copy()
+    spine = dam[
+        [
+            "Datetime",
+            "dam_mcp",
+            "dam_purchase_bid",
+            "dam_sell_bid",
+            "dam_mcv",
+            "dam_volume",
+        ]
+    ].copy()
     spine["date"] = spine["Datetime"].dt.normalize()
 
     # 5.2 — Expand RTM (30-min sessions) to 2 x 15-min blocks, then join
@@ -238,8 +316,16 @@ def build_spine(dam: pd.DataFrame, rtm: pd.DataFrame, weather_agg: pd.DataFrame,
     rtm_expanded = pd.concat([rtm_expanded, second_block], ignore_index=True)
     rtm_expanded.sort_values("Datetime", inplace=True)
     rtm_expanded.reset_index(drop=True, inplace=True)
-    rtm_for_join = rtm[["Datetime", "rtm_mcp", "rtm_purchase_bid",
-                        "rtm_sell_bid", "rtm_mcv", "rtm_volume"]].copy()
+    rtm_for_join = rtm[
+        [
+            "Datetime",
+            "rtm_mcp",
+            "rtm_purchase_bid",
+            "rtm_sell_bid",
+            "rtm_mcv",
+            "rtm_volume",
+        ]
+    ].copy()
 
     spine = spine.merge(rtm_for_join, on="Datetime", how="left")
     log.info(f"  After RTM join: {spine.shape}")
@@ -276,7 +362,7 @@ def add_features(spine: pd.DataFrame) -> pd.DataFrame:
     df["hour"] = df["Datetime"].dt.hour
     df["minute"] = df["Datetime"].dt.minute
     df["block_number"] = df["hour"] * 4 + df["minute"] // 15  # 0–95
-    df["day_of_week"] = df["Datetime"].dt.dayofweek            # 0=Mon
+    df["day_of_week"] = df["Datetime"].dt.dayofweek  # 0=Mon
     df["day_of_month"] = df["Datetime"].dt.day
     df["week_of_month"] = (df["Datetime"].dt.day - 1) // 7 + 1
     df["is_weekend"] = (df["day_of_week"] >= 5).astype(int)
@@ -299,12 +385,19 @@ def add_features(spine: pd.DataFrame) -> pd.DataFrame:
     df["dam_mcp_lag_1d"] = df["dam_mcp"].shift(1 * bpd)
     df["dam_mcp_lag_2d"] = df["dam_mcp"].shift(2 * bpd)
     df["dam_mcp_lag_7d"] = df["dam_mcp"].shift(7 * bpd)
-    df["dam_mcp_roll_4h"] = df["dam_mcp"].shift(1).rolling(window=16, min_periods=4).mean()
-    df["dam_mcp_roll_24h"] = df["dam_mcp"].shift(1).rolling(window=96, min_periods=24).mean()
-    df["dam_mcp_roll_std_24h"] = df["dam_mcp"].shift(1).rolling(window=96, min_periods=24).std()
+    df["dam_mcp_roll_4h"] = (
+        df["dam_mcp"].shift(1).rolling(window=16, min_periods=4).mean()
+    )
+    df["dam_mcp_roll_24h"] = (
+        df["dam_mcp"].shift(1).rolling(window=96, min_periods=24).mean()
+    )
+    df["dam_mcp_roll_std_24h"] = (
+        df["dam_mcp"].shift(1).rolling(window=96, min_periods=24).std()
+    )
     df["mcp_spread"] = df["rtm_mcp"] - df["dam_mcp"]
-    df["dam_bid_imbalance"] = (df["dam_purchase_bid"] - df["dam_sell_bid"]) / \
-                              (df["dam_purchase_bid"] + df["dam_sell_bid"] + 1e-6)
+    df["dam_bid_imbalance"] = (df["dam_purchase_bid"] - df["dam_sell_bid"]) / (
+        df["dam_purchase_bid"] + df["dam_sell_bid"] + 1e-6
+    )
     log.info(f"  Features engineered: {df.shape}")
     return df
 
@@ -325,7 +418,7 @@ def finalize(df: pd.DataFrame) -> pd.DataFrame:
 # MAIN
 # ─────────────────────────────────────────────────────────────
 def main():
-    from src.lineage import lineage_run, ds
+    from src.lineage import ds, lineage_run
 
     args = build_args()
     month_str = f"{args.month:02d}"
@@ -340,10 +433,15 @@ def main():
     # instead of failing. build_features regenerates features only when fresh validated
     # data is available; otherwise the demo runs from the pinned snapshot.
     required = ["dam", "rtm", "weather", "calendar"]
-    missing = [d for d in required
-               if not (Path(_valid_glob(d, args.year, month_str)).exists()
-                       if d == "calendar"
-                       else glob.glob(_valid_glob(d, args.year, month_str)))]
+    missing = [
+        d
+        for d in required
+        if not (
+            Path(_valid_glob(d, args.year, month_str)).exists()
+            if d == "calendar"
+            else glob.glob(_valid_glob(d, args.year, month_str))
+        )
+    ]
     if missing:
         if OUTPUT_PATH.exists():
             log.warning(
@@ -368,9 +466,14 @@ def main():
         dam_raw = load_parquet(_valid_glob("dam", args.year, month_str))
         cal_path = _valid_glob("calendar", args.year, month_str)
         cal_raw = pd.read_parquet(cal_path)
-        cal_raw = cal_raw[cal_raw["date"].between(
-            f"{args.year}-{month_str}-01", f"{args.year}-{month_str}-31")]
-        log.info(f"  Loaded calendar: {cal_raw.shape[0]} rows (filtered to {args.year}-{month_str})")
+        cal_raw = cal_raw[
+            cal_raw["date"].between(
+                f"{args.year}-{month_str}-01", f"{args.year}-{month_str}-31"
+            )
+        ]
+        log.info(
+            f"  Loaded calendar: {cal_raw.shape[0]} rows (filtered to {args.year}-{month_str})"
+        )
         weather_raw = load_parquet(_valid_glob("weather", args.year, month_str))
 
         # 2. Clean
@@ -394,8 +497,10 @@ def main():
         out = finalize(df)
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         out.to_parquet(OUTPUT_PATH, index=False)
-        log.info(f"  Saved: {OUTPUT_PATH.relative_to(PROJECT_ROOT)} "
-                 f"({out.shape[0]} rows x {out.shape[1]} cols)")
+        log.info(
+            f"  Saved: {OUTPUT_PATH.relative_to(PROJECT_ROOT)} "
+            f"({out.shape[0]} rows x {out.shape[1]} cols)"
+        )
 
     log.info("=" * 55)
     log.info("=== BUILD FEATURES COMPLETE ===")

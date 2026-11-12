@@ -15,11 +15,11 @@ Usage:
         pass
 """
 
-import os
 import logging
+import os
 import uuid
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 log = logging.getLogger("lineage")
 
@@ -34,12 +34,12 @@ _client = None
 try:
     from openlineage.client import OpenLineageClient
     from openlineage.client.run import (
+        InputDataset,
+        Job,
+        OutputDataset,
+        Run,
         RunEvent,
         RunState,
-        Run,
-        Job,
-        InputDataset,
-        OutputDataset,
     )
 
     _HAS_OL = True
@@ -72,7 +72,7 @@ def _get_client():
         )
         _client = OpenLineageClient(transport=HttpTransport(config))
         return _client
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         log.debug(f"OpenLineage client init failed: {e}")
         return None
 
@@ -84,17 +84,13 @@ def ds(name, namespace=None):
 def _make_inputs(datasets):
     if not datasets or not _HAS_OL:
         return []
-    return [
-        InputDataset(namespace=d["namespace"], name=d["name"]) for d in datasets
-    ]
+    return [InputDataset(namespace=d["namespace"], name=d["name"]) for d in datasets]
 
 
 def _make_outputs(datasets):
     if not datasets or not _HAS_OL:
         return []
-    return [
-        OutputDataset(namespace=d["namespace"], name=d["name"]) for d in datasets
-    ]
+    return [OutputDataset(namespace=d["namespace"], name=d["name"]) for d in datasets]
 
 
 def _emit(state_name, job_name, run_id, inputs=None, outputs=None):
@@ -107,7 +103,7 @@ def _emit(state_name, job_name, run_id, inputs=None, outputs=None):
     try:
         event = RunEvent(
             eventType=getattr(RunState, state_name),
-            eventTime=datetime.now(timezone.utc).isoformat(),
+            eventTime=datetime.now(UTC).isoformat(),
             run=Run(runId=str(run_id)),
             job=Job(namespace=NAMESPACE, name=job_name),
             inputs=_make_inputs(inputs),
@@ -116,7 +112,7 @@ def _emit(state_name, job_name, run_id, inputs=None, outputs=None):
         )
         client.emit(event)
         log.info(f"Lineage {state_name}: {job_name}")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         log.debug(f"Lineage emit skipped: {e}")
 
 
