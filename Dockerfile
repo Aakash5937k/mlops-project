@@ -11,7 +11,7 @@ COPY app/ ./app/
 COPY src/ ./src/
 COPY app_config/ ./app_config/
 COPY models/ ./models/
-#COPY monitoring/ ./monitoring/
+COPY monitoring/ ./monitoring/
 
 EXPOSE 8000
 
