@@ -22,7 +22,7 @@ spec:
     spec:
       containers:
         - name: gmr-app
-          image: ghcr.io/aakash5937k/gmr-app:ba23104
+          image: ghcr.io/aakash5937k/gmr-app:94a2cf9
           command: ["gunicorn"]
           args:
             - "-w"
